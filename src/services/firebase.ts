@@ -65,34 +65,37 @@ export function saveStoredLocalUser(profile: UserProfile): void {
   }
 }
 
-export function createDefaultProfile(uid: string, email: string, displayName: string, department = 'Vývoj & IT'): UserProfile {
-  const initials = displayName
+export function createDefaultProfile(uid: string, email: string, displayName: string, department = 'Vedení & IT Architektura'): UserProfile {
+  const isZbynekAdmin = email?.toLowerCase() === 'zbynek.kasnar@gmail.com';
+  const finalDisplayName = displayName || (isZbynekAdmin ? 'Zbyněk Kašnar' : email.split('@')[0]);
+  const initials = finalDisplayName
     .split(' ')
     .map(p => p[0])
     .join('')
     .toUpperCase()
-    .slice(0, 2) || 'UZ';
+    .slice(0, 2) || (isZbynekAdmin ? 'ZK' : 'UZ');
 
   return {
     uid,
     email,
-    displayName: displayName || email.split('@')[0],
-    department,
-    role: 'Člen týmu',
+    displayName: finalDisplayName,
+    department: isZbynekAdmin ? 'Vedení & IT Architektura' : department,
+    role: isZbynekAdmin ? 'Administrátor & Správce' : 'Člen týmu',
     avatarSeed: initials,
-    emailVerified: false,
+    emailVerified: isZbynekAdmin ? true : false,
+    isAdmin: isZbynekAdmin,
     createdAt: Date.now(),
     stats: {
       gamesPlayed: 0,
       gamesWon: 0,
-      currentStreak: 1,
-      maxStreak: 1,
+      currentStreak: 0,
+      maxStreak: 0,
       totalGuesses: 0,
       millionaireCorrect: 0,
       hangmanUsed: 0,
       totalScore: 0
     },
-    badges: ['first_word'],
+    badges: [],
     dailyProgress: {}
   };
 }
@@ -102,12 +105,22 @@ export async function getUserProfileFromFirestore(uid: string): Promise<UserProf
     const userDocRef = doc(db, 'users', uid);
     const snap = await getDoc(userDocRef);
     if (snap.exists()) {
-      return snap.data() as UserProfile;
+      const data = snap.data() as UserProfile;
+      if (data.email?.toLowerCase() === 'zbynek.kasnar@gmail.com') {
+        data.isAdmin = true;
+        if (!data.role || data.role === 'Člen týmu') data.role = 'Administrátor & Správce';
+      }
+      return data;
     }
   } catch (err) {
     console.warn('Firestore offline or permission restricted, falling back to local state:', err);
   }
-  return getStoredLocalUser();
+  const local = getStoredLocalUser();
+  if (local && local.email?.toLowerCase() === 'zbynek.kasnar@gmail.com') {
+    local.isAdmin = true;
+    if (!local.role || local.role === 'Člen týmu') local.role = 'Administrátor & Správce';
+  }
+  return local;
 }
 
 export async function syncUserProfileToFirestore(profile: UserProfile): Promise<void> {

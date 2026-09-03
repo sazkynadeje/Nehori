@@ -41,6 +41,7 @@ interface AuthContextType {
   completeHangman: (dateKey: string, category: CategoryId, success: boolean) => void;
   completeMillionaire: (dateKey: string, category: CategoryId, isCorrect: boolean, bonusScore: number) => void;
   resetCategoryProgress: (dateKey: string, category: CategoryId) => void;
+  resetAllUserData: () => void;
   updateUserBio: (displayName: string, department: string, role: string) => void;
 }
 
@@ -81,23 +82,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // If not logged in via Firebase session, check local storage
         const local = getStoredLocalUser();
-        if (local) {
+        if (local && local.email && local.email !== 'jan.kovar@firma.cz') {
+          if (local.email.toLowerCase() === 'zbynek.kasnar@gmail.com') {
+            local.isAdmin = true;
+            local.role = 'Administrátor & Správce';
+            local.emailVerified = true;
+          }
           setUser(local);
           setEmailVerificationPending(!local.emailVerified);
         } else {
-          // Default demo logged-in user for effortless exploration
-          const demoUser = createDefaultProfile('demo_user_1', 'jan.kovar@firma.cz', 'Jan Kovář', 'Vývoj & IT Architektura');
-          demoUser.emailVerified = true;
-          demoUser.role = 'Senior Frontend Engineer';
-          demoUser.stats.totalScore = 1480;
-          demoUser.stats.gamesPlayed = 15;
-          demoUser.stats.gamesWon = 12;
-          demoUser.stats.currentStreak = 14;
-          demoUser.stats.maxStreak = 14;
-          demoUser.badges = ['first_word', 'hot_streak_3', 'hot_streak_7', 'steam_engine'];
-          
-          saveStoredLocalUser(demoUser);
-          setUser(demoUser);
+          // Clean state: start at login/register screen or zero data
+          setUser(null);
           setEmailVerificationPending(false);
         }
         setLoading(false);
@@ -105,8 +100,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (e) {
       console.warn('Firebase Auth listener error, using local state:', e);
       const local = getStoredLocalUser();
-      if (local) {
+      if (local && local.email && local.email !== 'jan.kovar@firma.cz') {
+        if (local.email.toLowerCase() === 'zbynek.kasnar@gmail.com') {
+          local.isAdmin = true;
+          local.role = 'Administrátor & Správce';
+          local.emailVerified = true;
+        }
         setUser(local);
+      } else {
+        setUser(null);
       }
       setLoading(false);
     }
@@ -469,6 +471,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     syncUserProfileToFirestore(updated);
   };
 
+  const resetAllUserData = () => {
+    if (!user) return;
+    const cleanProfile: UserProfile = {
+      ...user,
+      stats: {
+        gamesPlayed: 0,
+        gamesWon: 0,
+        currentStreak: 0,
+        maxStreak: 0,
+        totalGuesses: 0,
+        millionaireCorrect: 0,
+        hangmanUsed: 0,
+        totalScore: 0
+      },
+      badges: [],
+      dailyProgress: {}
+    };
+    setUser(cleanProfile);
+    saveStoredLocalUser(cleanProfile);
+    syncUserProfileToFirestore(cleanProfile);
+  };
+
   const updateUserBio = (displayName: string, department: string, role: string) => {
     if (!user) return;
     const updated: UserProfile = {
@@ -497,6 +521,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         completeHangman,
         completeMillionaire,
         resetCategoryProgress,
+        resetAllUserData,
         updateUserBio
       }}
     >

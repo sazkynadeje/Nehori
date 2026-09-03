@@ -112,6 +112,7 @@ export interface UserProfile {
   createdAt: number;
   stats: UserStats;
   badges: string[]; // badge IDs
+  isAdmin?: boolean;
   dailyProgress: {
     [dateKey: string]: {
       [category in CategoryId]?: {
