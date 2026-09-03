@@ -114,12 +114,14 @@ export const AuthView: React.FC = () => {
 
         {/* Brand Header */}
         <div className="flex items-center space-x-3 mb-8">
-          <div className="w-10 h-10 bg-gradient-to-tr from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
-            <span className="text-white font-extrabold text-xl">K</span>
+          <div className="w-11 h-11 bg-gradient-to-tr from-amber-500 via-rose-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-rose-500/30">
+            <span className="text-white font-black text-2xl">!</span>
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-white">KORPO-LINGVO</h1>
-            <p className="text-xs text-slate-400">Firemní slovníková a sémantická hra</p>
+            <h1 className="text-2xl font-black tracking-tight text-white flex items-center gap-1.5">
+              NE! <span className="text-amber-400">Naopak!</span>
+            </h1>
+            <p className="text-xs text-slate-400 font-medium">Týmová denní slovní výzva – 1 společné slovo denně</p>
           </div>
         </div>
 

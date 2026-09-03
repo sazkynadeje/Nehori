@@ -1,15 +1,25 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { CategoryId } from '../types';
 import { CATEGORIES, getDailyWord, getFormattedCzechDate, getTodayDateString } from '../data/words';
 import { useAuth } from '../context/AuthContext';
-import { Globe, Briefcase, Cpu, CheckCircle2, ChevronRight, Flame, Sparkles, Award } from 'lucide-react';
+import { useCurator } from '../context/CuratorContext';
+import { CuratorIntroModal } from './CuratorIntroModal';
+import { Globe, Briefcase, Cpu, CheckCircle2, ChevronRight, Flame, Sparkles, Award, Crown, History, Info } from 'lucide-react';
 
 interface CategorySelectionProps {
   onSelectCategory: (categoryId: CategoryId) => void;
+  onNavigateToCurator?: () => void;
+  onNavigateToHistory?: () => void;
 }
 
-export const CategorySelection: React.FC<CategorySelectionProps> = ({ onSelectCategory }) => {
+export const CategorySelection: React.FC<CategorySelectionProps> = ({ 
+  onSelectCategory,
+  onNavigateToCurator,
+  onNavigateToHistory
+}) => {
   const { user } = useAuth();
+  const { todayCurator, isUserCurator } = useCurator();
+  const [showCuratorModal, setShowCuratorModal] = useState(false);
   const todayStr = getTodayDateString();
   const todayProgress = user?.dailyProgress[todayStr] || {};
 
@@ -77,6 +87,64 @@ export const CategorySelection: React.FC<CategorySelectionProps> = ({ onSelectCa
           </div>
         </div>
       </div>
+
+      {/* Curator & History Quick Spotlight Banner */}
+      <div className="bg-gradient-to-r from-amber-950/20 via-slate-900 to-indigo-950/30 rounded-2xl border border-amber-500/20 p-5 flex flex-col md:flex-row items-center justify-between gap-4 shadow-xl">
+        <div className="flex items-center space-x-3.5">
+          <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center flex-shrink-0">
+            <Crown className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="text-xs font-bold text-amber-300 flex items-center space-x-2">
+              <span>Dnešní slova vybíral(a): {todayCurator.displayName} ({todayCurator.department})</span>
+            </div>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Každý den náhodně vybraný aktivní kolega vybírá ze 4 AI návrhů slova pro celý tým.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-2 w-full md:w-auto flex-shrink-0 justify-end">
+          <button
+            id="btn-show-curator-details"
+            onClick={() => setShowCuratorModal(true)}
+            className="px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-amber-300 text-xs font-medium transition-all flex items-center space-x-1.5"
+          >
+            <Crown className="w-3.5 h-3.5 text-amber-400" />
+            <span>Kdo vybíral slova?</span>
+          </button>
+
+          {isUserCurator && onNavigateToCurator && (
+            <button
+              id="btn-quick-curator"
+              onClick={onNavigateToCurator}
+              className="px-3.5 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold transition-all flex items-center space-x-1.5"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>Výběr na zítra (Kurátor)</span>
+            </button>
+          )}
+
+          {onNavigateToHistory && (
+            <button
+              id="btn-quick-history"
+              onClick={onNavigateToHistory}
+              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-semibold transition-all flex items-center space-x-1.5"
+            >
+              <History className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Historie a archiv</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      <CuratorIntroModal
+        isOpen={showCuratorModal}
+        onClose={() => setShowCuratorModal(false)}
+        curatorName={todayCurator.displayName}
+        curatorDepartment={todayCurator.department}
+        curatorNote={todayCurator.note}
+      />
 
       {/* 3 Categories Grid */}
       <div className="space-y-4">

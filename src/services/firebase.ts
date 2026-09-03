@@ -23,15 +23,15 @@ import {
 import { UserProfile, UserStats, CategoryId, GuessRecord } from '../types';
 import { INITIAL_TEAM_COLLEAGUES } from '../data/team';
 
-// Firebase Client Configuration
-// In production, these are injected via environment or firebase-applet-config.json
+// Firebase Client Configuration for project: nenaopak
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDemoKeyMockForSeamlessPreview12345",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "korpo-lingvo-demo.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "korpo-lingvo-demo",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "korpo-lingvo-demo.appspot.com",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "102630834113",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:102630834113:web:a1b2c3d4e5f6g7h8"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyA8v06FxxITxYDWLx_crwGnN8TvE06eKEo",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "nenaopak.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "nenaopak",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "nenaopak.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "285869657043",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:285869657043:web:8b20fcd9a3f67807bb7d26",
+  measurementId: "G-48EZ19KBQ4"
 };
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
@@ -119,3 +119,61 @@ export async function syncUserProfileToFirestore(profile: UserProfile): Promise<
     console.warn('Firestore sync postponed (local storage active):', err);
   }
 }
+
+export async function fetchAllUsersFromFirestore(): Promise<UserProfile[]> {
+  try {
+    const usersCol = collection(db, 'users');
+    const q = query(usersCol, orderBy('stats.totalScore', 'desc'));
+    const snapshot = await getDocs(q);
+    const list: UserProfile[] = [];
+    snapshot.forEach((d) => {
+      list.push(d.data() as UserProfile);
+    });
+    return list;
+  } catch (e) {
+    console.warn('Firestore fetchAllUsers fallback to local store:', e);
+    const allUsersRaw = localStorage.getItem(LOCAL_USERS_DB_KEY);
+    if (allUsersRaw) {
+      try {
+        return Object.values(JSON.parse(allUsersRaw));
+      } catch {}
+    }
+    return [];
+  }
+}
+
+export async function saveCuratedWordsToFirestore(dateKey: string, assignment: any): Promise<boolean> {
+  try {
+    const curatorRef = doc(db, 'curator_assignments', dateKey);
+    await setDoc(curatorRef, {
+      ...assignment,
+      updatedAt: Date.now()
+    }, { merge: true });
+    return true;
+  } catch (e) {
+    console.warn('Firestore saveCuratedWords error:', e);
+    return false;
+  }
+}
+
+export async function getCuratedWordsFromFirestore(dateKey: string): Promise<any | null> {
+  try {
+    const curatorRef = doc(db, 'curator_assignments', dateKey);
+    const snap = await getDoc(curatorRef);
+    if (snap.exists()) {
+      return snap.data();
+    }
+  } catch (e) {
+    console.warn('Firestore getCuratedWords error:', e);
+  }
+  return null;
+}
+
+export {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  fbSignOut,
+  fbSendEmailVerification,
+  onAuthStateChanged,
+  updateProfile
+};

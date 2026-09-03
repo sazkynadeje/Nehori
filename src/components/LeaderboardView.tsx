@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { ColleagueRank } from '../types';
+import React, { useState, useEffect } from 'react';
+import { ColleagueRank, UserProfile } from '../types';
 import { INITIAL_TEAM_COLLEAGUES } from '../data/team';
 import { ColleagueProfileModal } from './ColleagueProfileModal';
 import { useAuth } from '../context/AuthContext';
-import { Trophy, Medal, Flame, Search, ArrowUpDown, Filter, Award, ChevronRight, User } from 'lucide-react';
+import { fetchAllUsersFromFirestore } from '../services/firebase';
+import { Trophy, Medal, Flame, Search, ArrowUpDown, Filter, Award, ChevronRight, User, Database, RefreshCw } from 'lucide-react';
 
 export const LeaderboardView: React.FC = () => {
   const { user } = useAuth();
@@ -11,9 +12,51 @@ export const LeaderboardView: React.FC = () => {
   const [selectedDept, setSelectedDept] = useState<string>('all');
   const [selectedColleague, setSelectedColleague] = useState<ColleagueRank | null>(null);
   const [sortBy, setSortBy] = useState<'score' | 'streak' | 'rate'>('score');
+  const [firestoreUsers, setFirestoreUsers] = useState<UserProfile[]>([]);
+  const [loadingFirestore, setLoadingFirestore] = useState<boolean>(false);
 
-  // Combine initial 10 colleagues + currently logged in user if not already in roster
+  const loadFirestoreUsers = async () => {
+    try {
+      setLoadingFirestore(true);
+      const list = await fetchAllUsersFromFirestore();
+      setFirestoreUsers(list);
+    } catch (e) {
+      console.warn('Could not fetch firestore users for leaderboard:', e);
+    } finally {
+      setLoadingFirestore(false);
+    }
+  };
+
+  useEffect(() => {
+    loadFirestoreUsers();
+  }, []);
+
+  // Combine initial team colleagues + real Firestore users + currently logged in user
   let combinedRoster: ColleagueRank[] = [...INITIAL_TEAM_COLLEAGUES];
+
+  // Merge Firestore users
+  firestoreUsers.forEach((fu) => {
+    const asRank: ColleagueRank = {
+      uid: fu.uid,
+      displayName: fu.displayName,
+      department: fu.department,
+      role: fu.role,
+      avatarSeed: fu.avatarSeed,
+      totalScore: fu.stats.totalScore,
+      currentStreak: fu.stats.currentStreak,
+      gamesWon: fu.stats.gamesWon,
+      successRate: fu.stats.gamesPlayed > 0 ? Math.round((fu.stats.gamesWon / fu.stats.gamesPlayed) * 100) : 100,
+      badgesCount: fu.badges.length,
+      lastActive: 'Firebase hráč'
+    };
+    const idx = combinedRoster.findIndex(c => c.uid === fu.uid || c.displayName === fu.displayName);
+    if (idx >= 0) {
+      combinedRoster[idx] = asRank;
+    } else {
+      combinedRoster.push(asRank);
+    }
+  });
+
   if (user) {
     const userAsRank: ColleagueRank = {
       uid: user.uid,
@@ -90,9 +133,23 @@ export const LeaderboardView: React.FC = () => {
       <div className="bg-[#11192e] rounded-3xl border border-slate-800 p-6 md:p-8 shadow-2xl relative overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
-            <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-semibold mb-2">
-              <Trophy className="w-3.5 h-3.5" />
-              <span>Firemní Žebříček Kolegů</span>
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-semibold">
+                <Trophy className="w-3.5 h-3.5" />
+                <span>Firemní Žebříček Kolegů</span>
+              </div>
+              <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
+                <Database className="w-3.5 h-3.5" />
+                <span>Firebase: nenaopak</span>
+              </div>
+              <button
+                onClick={loadFirestoreUsers}
+                disabled={loadingFirestore}
+                title="Aktualizovat z Firebase databáze"
+                className="p-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition-colors text-xs flex items-center space-x-1"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loadingFirestore ? 'animate-spin' : ''}`} />
+              </button>
             </div>
             <h2 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">
               Kdo je největším mistrem firemní terminologie?

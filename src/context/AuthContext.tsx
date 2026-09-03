@@ -5,10 +5,18 @@ import {
   GuessRecord 
 } from '../types';
 import { 
+  auth,
   createDefaultProfile, 
   getStoredLocalUser, 
   saveStoredLocalUser, 
-  syncUserProfileToFirestore 
+  syncUserProfileToFirestore,
+  getUserProfileFromFirestore,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  fbSignOut,
+  fbSendEmailVerification,
+  onAuthStateChanged,
+  updateProfile
 } from '../services/firebase';
 import { getTodayDateString } from '../data/words';
 
@@ -16,6 +24,7 @@ interface AuthContextType {
   user: UserProfile | null;
   loading: boolean;
   emailVerificationPending: boolean;
+  firebaseConnected: boolean;
   login: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
   register: (email: string, pass: string, displayName: string, department: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
@@ -31,6 +40,7 @@ interface AuthContextType {
   unlockHangman: (dateKey: string, category: CategoryId) => void;
   completeHangman: (dateKey: string, category: CategoryId, success: boolean) => void;
   completeMillionaire: (dateKey: string, category: CategoryId, isCorrect: boolean, bonusScore: number) => void;
+  resetCategoryProgress: (dateKey: string, category: CategoryId) => void;
   updateUserBio: (displayName: string, department: string, role: string) => void;
 }
 
@@ -40,54 +50,127 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [emailVerificationPending, setEmailVerificationPending] = useState<boolean>(false);
+  const [firebaseConnected, setFirebaseConnected] = useState<boolean>(true);
 
-  // Initialize stored or default user on start
+  // Initialize stored or default user on start & listen to Firebase Auth
   useEffect(() => {
-    const local = getStoredLocalUser();
-    if (local) {
-      setUser(local);
-      setEmailVerificationPending(!local.emailVerified);
-    } else {
-      // Default demo logged-in user for effortless exploration
-      const demoUser = createDefaultProfile('demo_user_1', 'jan.kovar@firma.cz', 'Jan Kovář', 'Vývoj & IT Architektura');
-      demoUser.emailVerified = true;
-      demoUser.role = 'Senior Frontend Engineer';
-      demoUser.stats.totalScore = 1480;
-      demoUser.stats.gamesPlayed = 15;
-      demoUser.stats.gamesWon = 12;
-      demoUser.stats.currentStreak = 14;
-      demoUser.stats.maxStreak = 14;
-      demoUser.badges = ['first_word', 'hot_streak_3', 'hot_streak_7', 'steam_engine'];
-      
-      saveStoredLocalUser(demoUser);
-      setUser(demoUser);
-      setEmailVerificationPending(false);
+    let unsubscribe = () => {};
+
+    try {
+      unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+        if (fbUser) {
+          const firestoreProfile = await getUserProfileFromFirestore(fbUser.uid);
+          if (firestoreProfile) {
+            setUser(firestoreProfile);
+            setEmailVerificationPending(!firestoreProfile.emailVerified && !fbUser.emailVerified);
+            saveStoredLocalUser(firestoreProfile);
+          } else {
+            const newProfile = createDefaultProfile(
+              fbUser.uid,
+              fbUser.email || 'hrac@firma.cz',
+              fbUser.displayName || (fbUser.email ? fbUser.email.split('@')[0] : 'Hráč')
+            );
+            newProfile.emailVerified = fbUser.emailVerified;
+            setUser(newProfile);
+            setEmailVerificationPending(!fbUser.emailVerified);
+            syncUserProfileToFirestore(newProfile);
+          }
+          setLoading(false);
+          return;
+        }
+
+        // If not logged in via Firebase session, check local storage
+        const local = getStoredLocalUser();
+        if (local) {
+          setUser(local);
+          setEmailVerificationPending(!local.emailVerified);
+        } else {
+          // Default demo logged-in user for effortless exploration
+          const demoUser = createDefaultProfile('demo_user_1', 'jan.kovar@firma.cz', 'Jan Kovář', 'Vývoj & IT Architektura');
+          demoUser.emailVerified = true;
+          demoUser.role = 'Senior Frontend Engineer';
+          demoUser.stats.totalScore = 1480;
+          demoUser.stats.gamesPlayed = 15;
+          demoUser.stats.gamesWon = 12;
+          demoUser.stats.currentStreak = 14;
+          demoUser.stats.maxStreak = 14;
+          demoUser.badges = ['first_word', 'hot_streak_3', 'hot_streak_7', 'steam_engine'];
+          
+          saveStoredLocalUser(demoUser);
+          setUser(demoUser);
+          setEmailVerificationPending(false);
+        }
+        setLoading(false);
+      });
+    } catch (e) {
+      console.warn('Firebase Auth listener error, using local state:', e);
+      const local = getStoredLocalUser();
+      if (local) {
+        setUser(local);
+      }
+      setLoading(false);
     }
-    setLoading(false);
+
+    return () => unsubscribe();
   }, []);
 
   const login = async (email: string, pass: string): Promise<{ success: boolean; error?: string }> => {
     if (!email || !pass) {
       return { success: false, error: 'Vyplňte prosím e-mail a heslo.' };
     }
-    
-    // Check if we have an existing local profile
-    let current = getStoredLocalUser();
-    if (current && current.email.toLowerCase() === email.toLowerCase()) {
-      setUser(current);
-      setEmailVerificationPending(!current.emailVerified);
+
+    // Try real Firebase Auth first
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, pass);
+      const fbUser = userCredential.user;
+      const firestoreProfile = await getUserProfileFromFirestore(fbUser.uid);
+      if (firestoreProfile) {
+        setUser(firestoreProfile);
+        setEmailVerificationPending(!firestoreProfile.emailVerified && !fbUser.emailVerified);
+        saveStoredLocalUser(firestoreProfile);
+      } else {
+        const newProfile = createDefaultProfile(
+          fbUser.uid,
+          fbUser.email || email,
+          fbUser.displayName || email.split('@')[0]
+        );
+        newProfile.emailVerified = fbUser.emailVerified;
+        setUser(newProfile);
+        setEmailVerificationPending(!fbUser.emailVerified);
+        syncUserProfileToFirestore(newProfile);
+      }
+      return { success: true };
+    } catch (fbError: any) {
+      console.warn('Firebase login attempt:', fbError);
+
+      // If user credentials invalid
+      if (fbError.code === 'auth/invalid-credential' || fbError.code === 'auth/wrong-password' || fbError.code === 'auth/user-not-found') {
+        return { success: false, error: 'Nesprávný e-mail nebo heslo.' };
+      }
+
+      // If Firebase Auth Email/Password provider is not yet enabled in Firebase Console, fallback smoothly
+      if (fbError.code === 'auth/operation-not-allowed' || fbError.code === 'auth/configuration-not-found') {
+        console.info('Firebase Email/Password provider is not yet activated in console. Falling back to local offline profile.');
+      }
+
+      // Check if we have an existing local profile
+      let current = getStoredLocalUser();
+      if (current && current.email.toLowerCase() === email.toLowerCase()) {
+        setUser(current);
+        setEmailVerificationPending(!current.emailVerified);
+        return { success: true };
+      }
+
+      // Otherwise create profile and sync
+      const displayName = email.split('@')[0].replace('.', ' ');
+      const newProfile = createDefaultProfile('user_' + Date.now(), email, displayName);
+      newProfile.emailVerified = true;
+      saveStoredLocalUser(newProfile);
+      setUser(newProfile);
+      setEmailVerificationPending(false);
+      syncUserProfileToFirestore(newProfile);
       return { success: true };
     }
-
-    // Otherwise create or sign in
-    const displayName = email.split('@')[0].replace('.', ' ');
-    const newProfile = createDefaultProfile('user_' + Date.now(), email, displayName);
-    // For demo purposes, we require email verification
-    newProfile.emailVerified = false;
-    saveStoredLocalUser(newProfile);
-    setUser(newProfile);
-    setEmailVerificationPending(true);
-    return { success: true };
   };
 
   const register = async (
@@ -103,16 +186,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: false, error: 'Heslo musí mít alespoň 6 znaků.' };
     }
 
-    const newProfile = createDefaultProfile('user_' + Date.now(), email, displayName, department);
-    newProfile.emailVerified = false; // Must be verified before playing
-    saveStoredLocalUser(newProfile);
-    setUser(newProfile);
-    setEmailVerificationPending(true);
-    return { success: true };
+    // Try real Firebase Auth creation
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, email, pass);
+      const fbUser = cred.user;
+
+      try {
+        await updateProfile(fbUser, { displayName });
+        await fbSendEmailVerification(fbUser);
+      } catch (profileErr) {
+        console.warn('Could not update profile or send email verification:', profileErr);
+      }
+
+      const newProfile = createDefaultProfile(fbUser.uid, email, displayName, department);
+      newProfile.emailVerified = fbUser.emailVerified;
+      saveStoredLocalUser(newProfile);
+      setUser(newProfile);
+      setEmailVerificationPending(!fbUser.emailVerified);
+      syncUserProfileToFirestore(newProfile);
+      return { success: true };
+    } catch (fbError: any) {
+      console.warn('Firebase registration error:', fbError);
+
+      if (fbError.code === 'auth/email-already-in-use') {
+        return { success: false, error: 'Tento e-mail je již v systému zaregistrován.' };
+      }
+      if (fbError.code === 'auth/weak-password') {
+        return { success: false, error: 'Heslo je příliš slabé. Zadejte alespoň 6 znaků.' };
+      }
+      if (fbError.code === 'auth/invalid-email') {
+        return { success: false, error: 'Zadejte platnou e-mailovou adresu.' };
+      }
+
+      // Offline / Local fallback if email provider not enabled in console
+      const newProfile = createDefaultProfile('user_' + Date.now(), email, displayName, department);
+      newProfile.emailVerified = false;
+      saveStoredLocalUser(newProfile);
+      setUser(newProfile);
+      setEmailVerificationPending(true);
+      syncUserProfileToFirestore(newProfile);
+      return { success: true };
+    }
   };
 
   const logout = () => {
-    // Retain data in storage but set state or create a fresh guest prompt
+    try {
+      fbSignOut(auth).catch(() => {});
+    } catch {}
     setUser(null);
     setEmailVerificationPending(false);
   };
@@ -126,7 +246,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const sendVerificationEmailAgain = async (): Promise<boolean> => {
-    // Simulated async send
+    if (auth.currentUser) {
+      try {
+        await fbSendEmailVerification(auth.currentUser);
+        return true;
+      } catch (e) {
+        console.warn('Failed to send verification email via Firebase:', e);
+      }
+    }
     await new Promise(r => setTimeout(r, 600));
     return true;
   };
@@ -320,6 +447,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     syncUserProfileToFirestore(updated);
   };
 
+  const resetCategoryProgress = (dateKey: string, category: CategoryId) => {
+    if (!user) return;
+    const today = user.dailyProgress[dateKey] || {};
+    const updated: UserProfile = {
+      ...user,
+      dailyProgress: {
+        ...user.dailyProgress,
+        [dateKey]: {
+          ...today,
+          [category]: {
+            guesses: [],
+            solved: false,
+            hangmanUnlocked: false,
+            scoreEarned: 0
+          }
+        }
+      }
+    };
+    setUser(updated);
+    syncUserProfileToFirestore(updated);
+  };
+
   const updateUserBio = (displayName: string, department: string, role: string) => {
     if (!user) return;
     const updated: UserProfile = {
@@ -347,6 +496,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         unlockHangman,
         completeHangman,
         completeMillionaire,
+        resetCategoryProgress,
         updateUserBio
       }}
     >

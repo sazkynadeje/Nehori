@@ -35,6 +35,50 @@ export interface DailyWordData {
   hangmanWord: string; // The phrase or keyword to reveal in hangman
   millionaire: MillionaireQuestion;
   difficulty: 'Snadná' | 'Střední' | 'Pokročilá';
+  selectedBy?: string; // Name of active user who selected it
+  selectedByUid?: string;
+  selectedByDepartment?: string;
+  selectedAt?: number;
+}
+
+export interface WordCandidate {
+  id: string;
+  secretWord: string;
+  hintDefinition: string;
+  hangmanWord: string;
+  difficulty: 'Snadná' | 'Střední' | 'Pokročilá';
+  reasonWhyGreat?: string;
+  millionaire: MillionaireQuestion;
+}
+
+export interface CuratorAssignment {
+  targetDateKey: string; // The day they are curating for (e.g. tomorrow)
+  activeDateKey: string; // Today, when the selection takes place
+  curatorUid: string;
+  curatorDisplayName: string;
+  curatorDepartment: string;
+  isCompleted: boolean;
+  chosenWords?: {
+    [category in CategoryId]?: DailyWordData;
+  };
+  submittedAt?: number;
+}
+
+export interface DayHistoryRecord {
+  dateKey: string;
+  formattedDate: string;
+  curatorName: string;
+  curatorDepartment: string;
+  words: {
+    [category in CategoryId]?: {
+      secretWord: string;
+      hintDefinition: string;
+      difficulty: string;
+      solvedByUser?: boolean;
+      userGuessesCount?: number;
+      userScore?: number;
+    };
+  };
 }
 
 export interface Badge {

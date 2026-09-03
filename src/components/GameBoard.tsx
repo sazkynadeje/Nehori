@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { CategoryId, DailyWordData, GuessRecord } from '../types';
 import { CATEGORIES, getDailyWord, getTodayDateString } from '../data/words';
 import { useAuth } from '../context/AuthContext';
+import { useCurator } from '../context/CuratorContext';
 import { HangmanModal } from './HangmanModal';
 import { MillionaireModal } from './MillionaireModal';
+import { CuratorIntroModal } from './CuratorIntroModal';
 import { 
   Flame, 
   ArrowLeft, 
@@ -16,7 +18,8 @@ import {
   Unlock,
   ThermometerSnowflake,
   ThermometerSun,
-  AlertCircle
+  AlertCircle,
+  Crown
 } from 'lucide-react';
 import { INITIAL_TEAM_COLLEAGUES } from '../data/team';
 
@@ -27,22 +30,39 @@ interface GameBoardProps {
 
 export const GameBoard: React.FC<GameBoardProps> = ({ categoryId, onBackToCategories }) => {
   const { user, recordGuess, unlockHangman, completeHangman, completeMillionaire } = useAuth();
+  const { todayCurator } = useCurator();
   const [guessInput, setGuessInput] = useState('');
   const [evaluating, setEvaluating] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showHangman, setShowHangman] = useState(false);
   const [showMillionaire, setShowMillionaire] = useState(false);
-  const [, setWordVersion] = useState(0);
-
-  React.useEffect(() => {
-    const handleWordsUpdate = () => setWordVersion(v => v + 1);
-    window.addEventListener('korpo_words_updated', handleWordsUpdate);
-    return () => window.removeEventListener('korpo_words_updated', handleWordsUpdate);
-  }, []);
+  const [showCuratorIntro, setShowCuratorIntro] = useState(true);
 
   const todayStr = getTodayDateString();
   const categoryInfo = CATEGORIES.find((c) => c.id === categoryId) || CATEGORIES[0];
-  const dailyWord = getDailyWord(categoryId, todayStr);
+  const [dailyWord, setDailyWord] = useState<DailyWordData>(() => getDailyWord(categoryId, todayStr));
+
+  const curatorName = dailyWord.selectedBy || todayCurator?.displayName || 'Tereza Novotná';
+  const curatorDept = dailyWord.selectedByDepartment || todayCurator?.department || 'Produktový management';
+
+  // Fetch the synchronized daily word for this category and date
+  const fetchDailyWord = React.useCallback(async () => {
+    try {
+      const res = await fetch(`/api/daily-word?categoryId=${categoryId}&dateKey=${todayStr}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data) {
+          setDailyWord(json.data);
+        }
+      }
+    } catch (e) {
+      console.warn('Could not load daily word from server, using deterministic fallback:', e);
+    }
+  }, [categoryId, todayStr]);
+
+  React.useEffect(() => {
+    fetchDailyWord();
+  }, [fetchDailyWord]);
 
   const todayProgress = user?.dailyProgress[todayStr]?.[categoryId] || {
     guesses: [],
@@ -162,7 +182,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({ categoryId, onBackToCatego
           </div>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="bg-slate-900/80 px-3.5 py-2 rounded-xl border border-slate-800 flex items-center space-x-2 text-xs font-semibold text-slate-300 shadow-sm">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span>Společné slovo dne pro celý tým</span>
+          </div>
+
           <div className="bg-slate-900/80 px-4 py-2 rounded-xl border border-slate-800 flex items-center space-x-2.5">
             <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Získané body</span>
             <span className="text-lg font-mono font-bold text-indigo-400">
@@ -178,6 +203,28 @@ export const GameBoard: React.FC<GameBoardProps> = ({ categoryId, onBackToCatego
           </div>
         </div>
       </header>
+
+      {/* Curator Attribution Banner */}
+      <div className="bg-gradient-to-r from-amber-500/10 via-slate-900/90 to-indigo-500/10 border border-amber-500/25 rounded-2xl px-4 py-3 flex items-center justify-between gap-3 text-xs shadow-sm">
+        <div className="flex items-center space-x-2.5">
+          <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-300 flex items-center justify-center font-bold flex-shrink-0">
+            <Crown className="w-4 h-4 text-amber-400" />
+          </div>
+          <div>
+            <span className="text-slate-400">Dnešní slova pro tým vybral(a): </span>
+            <span className="font-bold text-amber-300">{curatorName}</span>
+            <span className="text-slate-400"> ({curatorDept})</span>
+          </div>
+        </div>
+        <button
+          id="btn-reopen-curator-modal"
+          onClick={() => setShowCuratorIntro(true)}
+          className="px-3 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-xs font-semibold transition-colors flex items-center space-x-1.5"
+        >
+          <Crown className="w-3.5 h-3.5" />
+          <span>Zobrazit vzkaz</span>
+        </button>
+      </div>
 
       {/* Main Grid: Arena & Sidebar info */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -205,7 +252,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ categoryId, onBackToCatego
                   </p>
                 </div>
 
-                <div className="flex sm:flex-col items-center sm:items-end gap-2">
+                <div className="flex flex-wrap sm:flex-col items-center sm:items-end gap-2">
                   <button
                     id="btn-reopen-millionaire"
                     onClick={() => setShowMillionaire(true)}
@@ -213,6 +260,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({ categoryId, onBackToCatego
                   >
                     <Trophy className="w-4 h-4" />
                     <span>{todayProgress.millionaireCompleted ? 'Zobrazit Milionáře' : 'Hrát Milionáře'}</span>
+                  </button>
+
+                  <button
+                    id="btn-back-to-categories-after-solve"
+                    onClick={onBackToCategories}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-600/30 flex items-center space-x-1.5 transition-colors"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    <span>Další dnešní kategorie</span>
                   </button>
                 </div>
               </div>
@@ -507,6 +563,16 @@ export const GameBoard: React.FC<GameBoardProps> = ({ categoryId, onBackToCatego
           onComplete={(isCorrect, bonus) => completeMillionaire(todayStr, categoryId, isCorrect, bonus)}
         />
       )}
+
+      {/* Curator Intro Modal - shows who selected today's words upon entering */}
+      <CuratorIntroModal
+        isOpen={showCuratorIntro}
+        onClose={() => setShowCuratorIntro(false)}
+        curatorName={curatorName}
+        curatorDepartment={curatorDept}
+        curatorNote={todayCurator?.note}
+        categoryTitle={categoryInfo.title}
+      />
     </div>
   );
 };

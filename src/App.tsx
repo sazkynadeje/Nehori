@@ -1,21 +1,22 @@
 import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { CuratorProvider } from './context/CuratorContext';
 import { AuthView } from './components/AuthView';
-import { Sidebar } from './components/Sidebar';
+import { Sidebar, MainTabType } from './components/Sidebar';
 import { MobileNavbar } from './components/MobileNavbar';
 import { CategorySelection } from './components/CategorySelection';
 import { GameBoard } from './components/GameBoard';
 import { LeaderboardView } from './components/LeaderboardView';
 import { ProfileView } from './components/ProfileView';
-import { TerminologyManagerView } from './components/TerminologyManagerView';
-import { FirestoreGuideView } from './components/FirestoreGuideView';
+import { CuratorView } from './components/CuratorView';
+import { HistoryView } from './components/HistoryView';
 import { CategoryId } from './types';
 import { CATEGORIES } from './data/words';
 import { Flame, Sparkles } from 'lucide-react';
 
 const MainAppContent: React.FC = () => {
   const { user, loading, emailVerificationPending } = useAuth();
-  const [activeTab, setActiveTab] = useState<'game' | 'leaderboard' | 'profile' | 'terminology' | 'schema'>('game');
+  const [activeTab, setActiveTab] = useState<MainTabType>('game');
   const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
 
   if (loading) {
@@ -23,7 +24,7 @@ const MainAppContent: React.FC = () => {
       <div className="flex items-center justify-center min-h-screen bg-[#0a0f1a]">
         <div className="flex flex-col items-center space-y-4">
           <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-slate-400 text-sm font-medium">Načítání herního světa Korpo-Lingvo...</p>
+          <p className="text-slate-400 text-sm font-medium">Načítání hry NE! Naopak!...</p>
         </div>
       </div>
     );
@@ -57,12 +58,12 @@ const MainAppContent: React.FC = () => {
         {/* Mobile Header Bar */}
         <div className="lg:hidden flex items-center justify-between mb-6 pb-4 border-b border-slate-800">
           <div className="flex items-center space-x-2.5">
-            <div className="w-8 h-8 bg-indigo-600 rounded-xl flex items-center justify-center font-black text-white text-base shadow-md">
-              K
+            <div className="w-8 h-8 bg-gradient-to-tr from-amber-500 via-rose-500 to-indigo-600 rounded-xl flex items-center justify-center font-black text-white text-base shadow-md">
+              !
             </div>
             <div>
-              <h1 className="text-base font-extrabold text-white leading-tight">KORPO-LINGVO</h1>
-              <span className="text-[10px] text-slate-400 font-medium">Firemní slovníková hra</span>
+              <h1 className="text-base font-extrabold text-white leading-tight">NE! Naopak!</h1>
+              <span className="text-[10px] text-slate-400 font-medium">1 slovo denně pro tým</span>
             </div>
           </div>
 
@@ -84,14 +85,18 @@ const MainAppContent: React.FC = () => {
           ) : (
             <CategorySelection
               onSelectCategory={(catId) => setSelectedCategory(catId)}
+              onNavigateToCurator={() => setActiveTab('curator')}
+              onNavigateToHistory={() => setActiveTab('history')}
             />
           )
         )}
 
+        {activeTab === 'curator' && (
+          <CuratorView onBackToGame={() => setActiveTab('game')} />
+        )}
+        {activeTab === 'history' && <HistoryView />}
         {activeTab === 'leaderboard' && <LeaderboardView />}
-        {activeTab === 'terminology' && <TerminologyManagerView />}
         {activeTab === 'profile' && <ProfileView />}
-        {activeTab === 'schema' && <FirestoreGuideView />}
       </main>
 
       {/* Mobile Bottom Navigation */}
@@ -111,7 +116,9 @@ const MainAppContent: React.FC = () => {
 export default function App() {
   return (
     <AuthProvider>
-      <MainAppContent />
+      <CuratorProvider>
+        <MainAppContent />
+      </CuratorProvider>
     </AuthProvider>
   );
 }

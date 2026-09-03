@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useCurator } from '../context/CuratorContext';
 import { ALL_BADGES } from '../data/badges';
 import { 
   User, 
@@ -15,11 +16,13 @@ import {
   Save, 
   HelpCircle,
   Clock,
-  Sparkles
+  Sparkles,
+  Crown
 } from 'lucide-react';
 
 export const ProfileView: React.FC = () => {
   const { user, updateUserBio } = useAuth();
+  const { isUserCurator, assignment, randomizeCurator } = useCurator();
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(user?.displayName || '');
   const [department, setDepartment] = useState(user?.department || 'Vývoj & IT Architektura');
@@ -159,6 +162,47 @@ export const ProfileView: React.FC = () => {
             </div>
           </form>
         )}
+
+        {/* Curator Role & Visibility Status */}
+        <div className="mt-6 pt-6 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center space-x-3.5">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+              isUserCurator 
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-md shadow-amber-950/40' 
+                : 'bg-slate-800/80 text-slate-400 border border-slate-700'
+            }`}>
+              <Crown className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xs font-bold text-white flex items-center space-x-2">
+                <span>Role kurátora slov:</span>
+                <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold ${
+                  isUserCurator
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                    : 'bg-slate-800 text-slate-400 border border-slate-700'
+                }`}>
+                  {isUserCurator ? 'Vy jste dnešní kurátor' : 'Běžný hráč'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {isUserCurator
+                  ? 'Záložka „Kurátor dne“ je pro vás aktivní. Můžete vybírat 4 AI slova pro tým.'
+                  : `Záložka kurátora je skrytá. Zítřejší slova dnes vybírá: ${assignment?.curatorDisplayName || 'Tereza Novotná'}.`}
+              </p>
+            </div>
+          </div>
+
+          {isUserCurator && (
+            <button
+              id="btn-profile-transfer-curator"
+              onClick={randomizeCurator}
+              className="px-3.5 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 text-xs font-medium transition-all flex items-center space-x-1.5 self-start sm:self-auto flex-shrink-0"
+            >
+              <Crown className="w-3.5 h-3.5 text-amber-400" />
+              <span>Předat roli jinému kolegovi</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Stats Summary Grid */}
