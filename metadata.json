@@ -1,0 +1,6 @@
+{
+  "name": "Firemní Slovníková a Znalostní Hra",
+  "description": "Slovníková a znalostní sémantická hra pro firemní tým s hádáním slov, teplotou pokusů, nápovědou Hangman a Milionářem.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

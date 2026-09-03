@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4f46e5" />
+      <stop offset="50%" stop-color="#7c3aed" />
+      <stop offset="100%" stop-color="#ec4899" />
+    </linearGradient>
+    <linearGradient id="flame" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#f59e0b" />
+      <stop offset="50%" stop-color="#ef4444" />
+      <stop offset="100%" stop-color="#fbbf24" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="url(#bg)" />
+  <circle cx="256" cy="256" r="180" fill="#0f172a" fill-opacity="0.6" stroke="#ffffff" stroke-opacity="0.2" stroke-width="4" />
+  <!-- Thermometer / Flame Icon -->
+  <path d="M256 120 C230 120 210 140 210 166 L210 280 C185 300 170 330 170 365 C170 412 208 450 256 450 C304 450 342 412 342 365 C342 330 327 300 302 280 L302 166 C302 140 282 120 256 120 Z" fill="#1e293b" stroke="#38bdf8" stroke-width="12" stroke-linejoin="round"/>
+  <!-- Liquid / Mercury with glow -->
+  <circle cx="256" cy="370" r="55" fill="url(#flame)" />
+  <rect x="238" y="200" width="36" height="150" rx="18" fill="url(#flame)" />
+  <!-- Degree symbol and letters -->
+  <text x="375" y="190" fill="#38bdf8" font-size="64" font-family="Arial, sans-serif" font-weight="bold">100°C</text>
+  <path d="M256 70 L275 105 L315 110 L285 138 L293 178 L256 158 L219 178 L227 138 L197 110 L237 105 Z" fill="#fbbf24" opacity="0.9"/>
+</svg>
