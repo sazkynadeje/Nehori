@@ -21,7 +21,8 @@ import {
   AlertCircle,
   Crown
 } from 'lucide-react';
-import { INITIAL_TEAM_COLLEAGUES } from '../data/team';
+import { fetchAllUsersFromFirestore } from '../services/firebase';
+import { UserProfile } from '../types';
 
 interface GameBoardProps {
   categoryId: CategoryId;
@@ -37,13 +38,20 @@ export const GameBoard: React.FC<GameBoardProps> = ({ categoryId, onBackToCatego
   const [showHangman, setShowHangman] = useState(false);
   const [showMillionaire, setShowMillionaire] = useState(false);
   const [showCuratorIntro, setShowCuratorIntro] = useState(true);
+  const [teamRoster, setTeamRoster] = useState<UserProfile[]>([]);
 
   const todayStr = getTodayDateString();
   const categoryInfo = CATEGORIES.find((c) => c.id === categoryId) || CATEGORIES[0];
   const [dailyWord, setDailyWord] = useState<DailyWordData>(() => getDailyWord(categoryId, todayStr));
 
-  const curatorName = dailyWord.selectedBy || todayCurator?.displayName || 'Tereza Novotná';
-  const curatorDept = dailyWord.selectedByDepartment || todayCurator?.department || 'Produktový management';
+  const curatorName = dailyWord.selectedBy || todayCurator?.displayName || 'Tým';
+  const curatorDept = dailyWord.selectedByDepartment || todayCurator?.department || 'Tým';
+
+  React.useEffect(() => {
+    fetchAllUsersFromFirestore().then((users) => {
+      setTeamRoster(users.filter((u) => u.uid !== user?.uid));
+    });
+  }, [user?.uid]);
 
   // Fetch the synchronized daily word for this category and date
   const fetchDailyWord = React.useCallback(async () => {
@@ -470,37 +478,22 @@ export const GameBoard: React.FC<GameBoardProps> = ({ categoryId, onBackToCatego
               <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
                 Týmový denní puls ({categoryInfo.title})
               </h3>
-              <span className="text-[10px] text-indigo-400 font-mono">10 kolegů</span>
+              <span className="text-[10px] text-indigo-400 font-mono">
+                {teamRoster.length + 1} {teamRoster.length + 1 === 1 ? 'hráč' : teamRoster.length + 1 < 5 ? 'hráči' : 'hráčů'}
+              </span>
             </div>
 
             <div className="space-y-3 flex-1">
-              {/* Leader */}
-              <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
-                <div className="flex items-center space-x-3">
-                  <span className="text-emerald-400 font-mono font-bold text-xs">1.</span>
-                  <div className="w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-[10px] text-emerald-400 font-bold">
-                    PM
-                  </div>
-                  <div>
-                    <span className="text-xs font-semibold text-white block">Petr Marek</span>
-                    <span className="text-[10px] text-slate-500">IT Architektura</span>
-                  </div>
-                </div>
-                <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
-                  100.0 °C
-                </span>
-              </div>
-
               {/* Current user */}
               <div className="flex items-center justify-between p-2.5 rounded-xl bg-indigo-600/10 border border-indigo-500/30">
                 <div className="flex items-center space-x-3">
-                  <span className="text-indigo-400 font-mono font-bold text-xs">2.</span>
+                  <span className="text-indigo-400 font-mono font-bold text-xs">1.</span>
                   <div className="w-8 h-8 rounded-full bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-[10px] text-indigo-400 font-bold">
-                    {user?.avatarSeed || 'JK'}
+                    {user?.avatarSeed || 'VY'}
                   </div>
                   <div>
                     <span className="text-xs font-bold text-indigo-200 block">Vy ({user?.displayName.split(' ')[0]})</span>
-                    <span className="text-[10px] text-slate-400">{user?.department}</span>
+                    <span className="text-[10px] text-slate-400">{user?.role}</span>
                   </div>
                 </div>
                 <span className="text-xs font-mono font-bold text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded">
@@ -508,23 +501,32 @@ export const GameBoard: React.FC<GameBoardProps> = ({ categoryId, onBackToCatego
                 </span>
               </div>
 
-              {/* Other colleagues */}
-              {INITIAL_TEAM_COLLEAGUES.slice(1, 4).map((colleague, cIdx) => (
-                <div key={colleague.uid} className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-900/50">
-                  <div className="flex items-center space-x-3">
-                    <span className="text-slate-500 font-mono font-bold text-xs">{cIdx + 3}.</span>
-                    <div className="w-7 h-7 rounded-full bg-slate-800 flex items-center justify-center text-[10px] text-slate-400 font-semibold">
-                      {colleague.avatarSeed}
+              {/* Other real colleagues if any */}
+              {teamRoster.length > 0 ? (
+                teamRoster.slice(0, 4).map((colleague, cIdx) => (
+                  <div key={colleague.uid} className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-900/50">
+                    <div className="flex items-center space-x-3">
+                      <span className="text-slate-500 font-mono font-bold text-xs">{cIdx + 2}.</span>
+                      <div className="w-7 h-7 rounded-full bg-slate-800 flex items-center justify-center text-[10px] text-slate-400 font-semibold">
+                        {colleague.avatarSeed}
+                      </div>
+                      <div>
+                        <span className="text-xs text-slate-300 block">{colleague.displayName}</span>
+                        <span className="text-[10px] text-slate-500">{colleague.role}</span>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-xs text-slate-300 block">{colleague.displayName}</span>
-                    </div>
+                    <span className="text-[11px] font-mono text-slate-400">
+                      {colleague.stats.totalScore > 0 ? `${colleague.stats.totalScore} b.` : 'Aktivní'}
+                    </span>
                   </div>
-                  <span className="text-[11px] font-mono text-slate-400">
-                    {(78.5 - cIdx * 12).toFixed(1)} °C
-                  </span>
+                ))
+              ) : (
+                <div className="p-4 rounded-xl bg-slate-900/40 border border-dashed border-slate-800 text-center mt-2">
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Zatím jste v týmu jediný aktivní hráč. Až se připojí kolegové, uvidíte zde jejich průběžné skóre.
+                  </p>
                 </div>
-              ))}
+              )}
             </div>
           </div>
 

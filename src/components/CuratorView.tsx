@@ -3,6 +3,7 @@ import { CategoryId, WordCandidate, CuratorAssignment } from '../types';
 import { CATEGORIES, getFormattedCzechDate, getTodayDateString } from '../data/words';
 import { useAuth } from '../context/AuthContext';
 import { useCurator } from '../context/CuratorContext';
+import { fetchAllUsersFromFirestore } from '../services/firebase';
 import { 
   Sparkles, 
   CheckCircle2, 
@@ -26,7 +27,7 @@ interface CuratorViewProps {
 
 export const CuratorView: React.FC<CuratorViewProps> = ({ onBackToGame }) => {
   const { user } = useAuth();
-  const { refreshStatus: refreshGlobalCuratorStatus } = useCurator();
+  const { refreshStatus: refreshGlobalCuratorStatus, claimCuratorRole } = useCurator();
   const todayStr = getTodayDateString();
 
   // Calculate tomorrow's date
@@ -158,15 +159,14 @@ export const CuratorView: React.FC<CuratorViewProps> = ({ onBackToGame }) => {
 
   // Handle handing off / randomizing curator to another colleague
   const handleRandomizeCurator = async () => {
-    const colleagues = [
-      { uid: 'colleague_1', displayName: 'Tereza Novotná', department: 'Produktový management' },
-      { uid: 'colleague_2', displayName: 'Martin Dvořák', department: 'Datová analytika & AI' },
-      { uid: 'colleague_3', displayName: 'Petra Černá', department: 'UX & Product Design' },
-      { uid: 'colleague_4', displayName: 'Lukáš Veselý', department: 'Backend & Cloud Infra' },
-      { uid: 'colleague_5', displayName: 'Jana Králová', department: 'Marketing & Komunikace' }
-    ].filter((c) => !user || c.uid !== user.uid);
-    const picked = colleagues[Math.floor(Math.random() * colleagues.length)];
     try {
+      const allUsers = await fetchAllUsersFromFirestore();
+      const colleagues = allUsers.filter((c) => !user || c.uid !== user.uid);
+      if (colleagues.length === 0) {
+        alert('V aplikaci zatím nejsou zaregistrovaní další hráči, kterým by bylo možné roli kurátora předat.');
+        return;
+      }
+      const picked = colleagues[Math.floor(Math.random() * colleagues.length)];
       const res = await fetch('/api/curator/assign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -174,7 +174,7 @@ export const CuratorView: React.FC<CuratorViewProps> = ({ onBackToGame }) => {
           targetDateKey: tomorrowStr,
           curatorUid: picked.uid,
           curatorDisplayName: picked.displayName,
-          curatorDepartment: picked.department
+          curatorDepartment: picked.department || 'Tým'
         })
       });
       if (res.ok) {
@@ -191,10 +191,12 @@ export const CuratorView: React.FC<CuratorViewProps> = ({ onBackToGame }) => {
   };
 
   const isUserCurator = Boolean(
-    user && assignment && (
-      assignment.curatorUid === user.uid ||
+    user && (
+      user.isAdmin ||
       user.role?.toLowerCase().includes('kurátor') ||
-      user.role?.toLowerCase().includes('admin')
+      user.role?.toLowerCase().includes('admin') ||
+      user.role?.toLowerCase().includes('správce') ||
+      (assignment && assignment.curatorUid === user.uid)
     )
   );
 
@@ -264,15 +266,12 @@ export const CuratorView: React.FC<CuratorViewProps> = ({ onBackToGame }) => {
 
           <div className="my-6 p-4 rounded-2xl bg-slate-900/80 border border-slate-800 max-w-md mx-auto text-left flex items-center space-x-4">
             <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-amber-500 to-rose-500 flex items-center justify-center text-white font-bold text-base flex-shrink-0">
-              {assignment?.curatorDisplayName?.slice(0, 2).toUpperCase() || 'TN'}
+              {assignment?.curatorDisplayName?.slice(0, 2).toUpperCase() || (user?.avatarSeed || 'TY')}
             </div>
             <div>
               <div className="text-xs text-slate-400">Dnešní vylosovaný kurátor:</div>
               <div className="text-base font-bold text-white">
-                {assignment?.curatorDisplayName || 'Tereza Novotná'}
-              </div>
-              <div className="text-xs text-amber-400/90 font-medium">
-                {assignment?.curatorDepartment || 'Produktový management'}
+                {assignment?.curatorDisplayName || user?.displayName || 'Tým'}
               </div>
             </div>
           </div>
@@ -282,6 +281,18 @@ export const CuratorView: React.FC<CuratorViewProps> = ({ onBackToGame }) => {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <button
+              id="btn-claim-curator-takeover"
+              onClick={async () => {
+                await claimCuratorRole();
+                await fetchStatus();
+                await refreshGlobalCuratorStatus();
+              }}
+              className="w-full sm:w-auto px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-indigo-600 hover:from-amber-400 hover:to-indigo-500 text-white font-bold text-sm shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center space-x-2"
+            >
+              <Crown className="w-4 h-4" />
+              <span>Převzít roli kurátora {user?.isAdmin ? '(Admin)' : ''}</span>
+            </button>
             {onBackToGame && (
               <button
                 onClick={onBackToGame}
@@ -331,10 +342,7 @@ export const CuratorView: React.FC<CuratorViewProps> = ({ onBackToGame }) => {
                 <span>Vylosovaný kurátor</span>
               </div>
               <div className="text-base font-bold text-white truncate">
-                {assignment?.curatorDisplayName || 'Jan Kovář'}
-              </div>
-              <div className="text-xs text-slate-400 truncate">
-                {assignment?.curatorDepartment || 'Firemní tým'}
+                {assignment?.curatorDisplayName || user?.displayName || 'Tým'}
               </div>
             </div>
 
@@ -363,6 +371,20 @@ export const CuratorView: React.FC<CuratorViewProps> = ({ onBackToGame }) => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
+            {assignment?.curatorUid !== user?.uid && (
+              <button
+                id="btn-curator-set-me"
+                onClick={async () => {
+                  await claimCuratorRole();
+                  await fetchStatus();
+                  await refreshGlobalCuratorStatus();
+                }}
+                className="px-3.5 py-1.5 bg-gradient-to-r from-amber-500 to-indigo-600 hover:from-amber-400 hover:to-indigo-500 text-white border border-amber-400/30 text-xs font-bold rounded-xl transition-all flex items-center space-x-1.5 shadow-md shadow-amber-900/20"
+              >
+                <Crown className="w-3.5 h-3.5" />
+                <span>Nastavit mě ({user?.displayName?.split(' ')[0] || 'Zbyněk'}) jako kurátora</span>
+              </button>
+            )}
             <button
               id="btn-randomize-curator"
               onClick={handleRandomizeCurator}

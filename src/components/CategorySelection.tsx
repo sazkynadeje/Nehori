@@ -96,7 +96,7 @@ export const CategorySelection: React.FC<CategorySelectionProps> = ({
           </div>
           <div>
             <div className="text-xs font-bold text-amber-300 flex items-center space-x-2">
-              <span>Dnešní slova vybíral(a): {todayCurator.displayName} ({todayCurator.department})</span>
+              <span>Dnešní slova vybíral(a): {todayCurator.displayName}</span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
               Každý den náhodně vybraný aktivní kolega vybírá ze 4 AI návrhů slova pro celý tým.

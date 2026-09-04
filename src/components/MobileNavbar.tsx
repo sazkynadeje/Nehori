@@ -26,18 +26,16 @@ export const MobileNavbar: React.FC<MobileNavbarProps> = ({ activeTab, setActive
         <span className="text-[10px] mt-1">Hra</span>
       </button>
 
-      {isUserCurator && (
-        <button
-          id="mobile-nav-curator"
-          onClick={() => setActiveTab('curator')}
-          className={`flex flex-col items-center py-1 px-2.5 rounded-xl transition-colors ${
-            activeTab === 'curator' ? 'text-amber-400 font-semibold' : 'text-slate-400'
-          }`}
-        >
-          <Crown className="w-5 h-5" />
-          <span className="text-[10px] mt-1">Kurátor</span>
-        </button>
-      )}
+      <button
+        id="mobile-nav-curator"
+        onClick={() => setActiveTab('curator')}
+        className={`flex flex-col items-center py-1 px-2.5 rounded-xl transition-colors ${
+          activeTab === 'curator' ? 'text-amber-400 font-semibold' : 'text-slate-400'
+        }`}
+      >
+        <Crown className="w-5 h-5" />
+        <span className="text-[10px] mt-1">Kurátor</span>
+      </button>
 
       <button
         id="mobile-nav-history"

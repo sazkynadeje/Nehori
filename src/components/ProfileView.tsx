@@ -17,43 +17,67 @@ import {
   HelpCircle,
   Clock,
   Sparkles,
-  Crown
+  Crown,
+  ShieldCheck,
+  RotateCcw,
+  Trash2,
+  LogOut,
+  RefreshCw
 } from 'lucide-react';
 
 export const ProfileView: React.FC = () => {
-  const { user, updateUserBio } = useAuth();
-  const { isUserCurator, assignment, randomizeCurator } = useCurator();
+  const { user, updateUserBio, resetAllUserData, logout } = useAuth();
+  const { isUserCurator, assignment, claimCuratorRole, refreshStatus: refreshGlobalCuratorStatus, randomizeCurator } = useCurator();
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(user?.displayName || '');
-  const [department, setDepartment] = useState(user?.department || 'Vývoj & IT Architektura');
-  const [role, setRole] = useState(user?.role || 'Senior Frontend Engineer');
+  const [role, setRole] = useState(user?.role || 'Administrátor & Správce');
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [curatorClaimSuccess, setCuratorClaimSuccess] = useState(false);
+  const [resetDataSuccess, setResetDataSuccess] = useState(false);
+  const [adminResetSuccess, setAdminResetSuccess] = useState(false);
 
   if (!user) return null;
 
   const handleSaveBio = (e: React.FormEvent) => {
     e.preventDefault();
-    updateUserBio(name, department, role);
+    updateUserBio(name, user.department || 'Tým', role);
     setIsEditing(false);
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3000);
   };
 
+  const handleTakeCurator = async () => {
+    await claimCuratorRole();
+    await refreshGlobalCuratorStatus();
+    setCuratorClaimSuccess(true);
+    setTimeout(() => setCuratorClaimSuccess(false), 4000);
+  };
+
+  const handleResetMyData = () => {
+    if (window.confirm('Opravdu chcete vyresetovat svůj herní postup na 0 pro čisté testování?')) {
+      resetAllUserData();
+      setResetDataSuccess(true);
+      setTimeout(() => setResetDataSuccess(false), 4000);
+    }
+  };
+
+  const handleAdminSystemReset = async () => {
+    if (window.confirm('Opravdu chcete vyprázdnit systémovou mezipaměť a historii na serveru?')) {
+      try {
+        const res = await fetch('/api/admin/reset-data', { method: 'POST' });
+        if (res.ok) {
+          await refreshGlobalCuratorStatus();
+          setAdminResetSuccess(true);
+          setTimeout(() => setAdminResetSuccess(false), 4000);
+        }
+      } catch (err) {
+        console.error('Error resetting system data:', err);
+      }
+    }
+  };
+
   const gamesPlayed = user.stats.gamesPlayed || 1;
   const winRate = Math.round((user.stats.gamesWon / Math.max(gamesPlayed, 1)) * 100);
-
-  const departments = [
-    'Vývoj & IT Architektura',
-    'Projektový Management',
-    'Produkt & UX Design',
-    'Lidské Zdroje (HR)',
-    'Obchod & Partnerství',
-    'Marketing & Brand',
-    'Finance & Controlling',
-    'Zákaznická Podpora',
-    'Provoz & Logistika',
-    'Právní & Compliance'
-  ];
 
   return (
     <div id="profile-view" className="space-y-8 max-w-5xl mx-auto">
@@ -68,6 +92,12 @@ export const ProfileView: React.FC = () => {
             <div>
               <div className="flex items-center space-x-2">
                 <h2 className="text-2xl font-extrabold text-white tracking-tight">{user.displayName}</h2>
+                {user.isAdmin && (
+                  <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-extrabold border border-amber-500/40">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>ADMIN</span>
+                  </span>
+                )}
                 {user.emailVerified && (
                   <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/30">
                     <CheckCircle2 className="w-3 h-3" />
@@ -78,8 +108,6 @@ export const ProfileView: React.FC = () => {
 
               <div className="flex flex-wrap items-center gap-y-1 gap-x-3 text-xs text-slate-400 mt-1">
                 <span className="text-indigo-300 font-semibold">{user.role}</span>
-                <span>•</span>
-                <span>{user.department}</span>
                 <span>•</span>
                 <span className="font-mono text-slate-500">{user.email}</span>
               </div>
@@ -106,7 +134,7 @@ export const ProfileView: React.FC = () => {
         {/* Edit Bio Form */}
         {isEditing && (
           <form onSubmit={handleSaveBio} className="mt-6 pt-6 border-t border-slate-800/80 space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
                   Celé jméno
@@ -131,23 +159,6 @@ export const ProfileView: React.FC = () => {
                   onChange={(e) => setRole(e.target.value)}
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl py-2 px-3 text-sm text-white focus:outline-none focus:border-indigo-500"
                 />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-                  Oddělení
-                </label>
-                <select
-                  value={department}
-                  onChange={(e) => setDepartment(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl py-2 px-3 text-sm text-white focus:outline-none focus:border-indigo-500"
-                >
-                  {departments.map((d) => (
-                    <option key={d} value={d}>
-                      {d}
-                    </option>
-                  ))}
-                </select>
               </div>
             </div>
 
@@ -187,7 +198,7 @@ export const ProfileView: React.FC = () => {
               <p className="text-xs text-slate-400 mt-0.5">
                 {isUserCurator
                   ? 'Záložka „Kurátor dne“ je pro vás aktivní. Můžete vybírat 4 AI slova pro tým.'
-                  : `Záložka kurátora je skrytá. Zítřejší slova dnes vybírá: ${assignment?.curatorDisplayName || 'Tereza Novotná'}.`}
+                  : `Záložka kurátora je skrytá. Zítřejší slova dnes vybírá: ${assignment?.curatorDisplayName || 'Tým'}.`}
               </p>
             </div>
           </div>
@@ -291,6 +302,130 @@ export const ProfileView: React.FC = () => {
               </div>
             );
           })}
+        </div>
+      </div>
+
+      {/* Admin & Testovací centrum */}
+      <div className="bg-[#11192e] rounded-3xl border border-amber-500/30 p-6 md:p-8 shadow-2xl relative overflow-hidden">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div className="flex items-center space-x-3">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center">
+              <ShieldCheck className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-white tracking-tight flex items-center space-x-2">
+                <span>Správa účtu & Testovací centrum</span>
+                {user.isAdmin && (
+                  <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    Admin
+                  </span>
+                )}
+              </h3>
+              <p className="text-slate-400 text-xs mt-0.5">
+                Nástroje pro testování od nuly, převzetí kurátorství a správu herních dat.
+              </p>
+            </div>
+          </div>
+
+          <button
+            id="btn-profile-logout"
+            onClick={logout}
+            className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 text-xs font-bold transition-all flex items-center space-x-2 self-start md:self-auto"
+          >
+            <LogOut className="w-4 h-4 text-rose-400" />
+            <span>Odhlásit se</span>
+          </button>
+        </div>
+
+        {/* Status Alerts */}
+        {curatorClaimSuccess && (
+          <div className="mb-4 p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-amber-300 text-xs flex items-center space-x-2">
+            <Crown className="w-4 h-4 text-amber-400 flex-shrink-0" />
+            <span>Úspěšně jste převzal(a) roli kurátora pro dnešek i zítřek! Nyní můžete vybrat slova v záložce Denní kurátor.</span>
+          </div>
+        )}
+
+        {resetDataSuccess && (
+          <div className="mb-4 p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl text-emerald-300 text-xs flex items-center space-x-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+            <span>Všechna vaše herní data byla vymazána. Začínáte od 0 bodů a čistého štítu!</span>
+          </div>
+        )}
+
+        {adminResetSuccess && (
+          <div className="mb-4 p-3.5 bg-indigo-500/10 border border-indigo-500/30 rounded-2xl text-indigo-300 text-xs flex items-center space-x-2">
+            <RefreshCw className="w-4 h-4 text-indigo-400 flex-shrink-0 animate-spin" />
+            <span>Systémová mezipaměť a historie byly úspěšně vyprázdněny.</span>
+          </div>
+        )}
+
+        {/* Action cards grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Action 1: Curator Takeover */}
+          <div className="bg-slate-900/80 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between space-y-3">
+            <div>
+              <div className="flex items-center space-x-2 text-amber-400 font-bold text-xs">
+                <Crown className="w-4 h-4" />
+                <span>Role kurátora</span>
+              </div>
+              <h4 className="text-sm font-bold text-white mt-1.5">Převzít roli kurátora</h4>
+              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                Okamžitě přiřadí váš účet ({user.displayName}) jako kurátora, abyste mohl schválit 4 AI slova pro celý tým.
+              </p>
+            </div>
+            <button
+              id="btn-profile-take-curator"
+              onClick={handleTakeCurator}
+              className="w-full py-2.5 px-3 bg-gradient-to-r from-amber-500 to-indigo-600 hover:from-amber-400 hover:to-indigo-500 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-amber-900/20 flex items-center justify-center space-x-1.5"
+            >
+              <Crown className="w-3.5 h-3.5" />
+              <span>Nastavit mě jako kurátora</span>
+            </button>
+          </div>
+
+          {/* Action 2: Reset my game progress */}
+          <div className="bg-slate-900/80 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between space-y-3">
+            <div>
+              <div className="flex items-center space-x-2 text-rose-400 font-bold text-xs">
+                <RotateCcw className="w-4 h-4" />
+                <span>Herní profil</span>
+              </div>
+              <h4 className="text-sm font-bold text-white mt-1.5">Začít od nuly (Reset dat)</h4>
+              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                Vynuluje statistiky, skóre, odehraná slova i odznaky vašeho účtu pro čisté testování herní smyčky.
+              </p>
+            </div>
+            <button
+              id="btn-profile-reset-my-data"
+              onClick={handleResetMyData}
+              className="w-full py-2.5 px-3 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-xs font-bold rounded-xl transition-all flex items-center justify-center space-x-1.5"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Vyprázdnit má data na 0</span>
+            </button>
+          </div>
+
+          {/* Action 3: System / Server Reset */}
+          <div className="bg-slate-900/80 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between space-y-3">
+            <div>
+              <div className="flex items-center space-x-2 text-indigo-400 font-bold text-xs">
+                <RefreshCw className="w-4 h-4" />
+                <span>Systémová data</span>
+              </div>
+              <h4 className="text-sm font-bold text-white mt-1.5">Vyčistit mezipaměť</h4>
+              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                Vymaže cache generovaných slov na serveru a historii, aby se denní výzvy a kurátorstvo načítaly znova.
+              </p>
+            </div>
+            <button
+              id="btn-profile-system-reset"
+              onClick={handleAdminSystemReset}
+              className="w-full py-2.5 px-3 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-bold rounded-xl transition-all flex items-center justify-center space-x-1.5"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Vyprázdnit systémovou mezipaměť</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

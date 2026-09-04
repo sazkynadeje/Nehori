@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { CuratorAssignment } from '../types';
 import { useAuth } from './AuthContext';
 import { getTodayDateString } from '../data/words';
+import { fetchAllUsersFromFirestore } from '../services/firebase';
 
 interface TodayCuratorInfo {
   displayName: string;
@@ -26,11 +27,11 @@ export const CuratorProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const { user } = useAuth();
   const [assignment, setAssignment] = useState<CuratorAssignment | null>(null);
   const [todayCurator, setTodayCurator] = useState<TodayCuratorInfo>({
-    displayName: 'Tereza Novotná',
-    department: 'Produktový management',
-    note: 'Vybrala jsem pro vás dnešní slova z firemní praxe i mezinárodní spolupráce. Hodně štěstí při hádání!'
+    displayName: 'Tým',
+    department: 'Tým',
+    note: 'Dnešní slova z firemní a mezinárodní praxe jsou připravena k hádání. Hodně štěstí!'
   });
-  const [activeUsersCount, setActiveUsersCount] = useState<number>(4);
+  const [activeUsersCount, setActiveUsersCount] = useState<number>(1);
   const [loading, setLoading] = useState<boolean>(true);
 
   const todayStr = getTodayDateString();
@@ -60,23 +61,24 @@ export const CuratorProvider: React.FC<{ children: React.ReactNode }> = ({ child
     refreshStatus();
   }, [refreshStatus]);
 
-  // Determine if current user is curator
+  // Determine if current user is curator or administrator
   const isUserCurator = Boolean(
-    user && assignment && (
-      assignment.curatorUid === user.uid ||
+    user && (
+      user.isAdmin ||
       user.role?.toLowerCase().includes('kurátor') ||
-      user.role?.toLowerCase().includes('admin')
+      user.role?.toLowerCase().includes('admin') ||
+      user.role?.toLowerCase().includes('správce') ||
+      (assignment && assignment.curatorUid === user.uid)
     )
   );
 
   const claimCuratorRole = async () => {
     if (!user) return;
     try {
-      const res = await fetch('/api/curator/assign', {
+      const res = await fetch('/api/curator/take-over', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          targetDateKey: tomorrowStr,
           curatorUid: user.uid,
           curatorDisplayName: user.displayName,
           curatorDepartment: user.department
@@ -84,8 +86,9 @@ export const CuratorProvider: React.FC<{ children: React.ReactNode }> = ({ child
       });
       if (res.ok) {
         const json = await res.json();
-        if (json.success && json.assignment) {
-          setAssignment(json.assignment);
+        if (json.success) {
+          if (json.assignment) setAssignment(json.assignment);
+          if (json.todayCurator) setTodayCurator(json.todayCurator);
         }
       }
     } catch (e) {
@@ -94,17 +97,14 @@ export const CuratorProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const randomizeCurator = async () => {
-    // Pick another colleague from team/active users (excluding current user to ensure clean transfer)
-    const colleagues = [
-      { uid: 'colleague_1', displayName: 'Tereza Novotná', department: 'Produktový management' },
-      { uid: 'colleague_2', displayName: 'Martin Dvořák', department: 'Datová analytika & AI' },
-      { uid: 'colleague_3', displayName: 'Petra Černá', department: 'UX & Product Design' },
-      { uid: 'colleague_4', displayName: 'Lukáš Veselý', department: 'Backend & Cloud Infra' },
-      { uid: 'colleague_5', displayName: 'Jana Králová', department: 'Marketing & Komunikace' }
-    ].filter((c) => !user || c.uid !== user.uid);
-
-    const picked = colleagues[Math.floor(Math.random() * colleagues.length)];
     try {
+      const allUsers = await fetchAllUsersFromFirestore();
+      const colleagues = allUsers.filter((c) => !user || c.uid !== user.uid);
+      if (colleagues.length === 0) {
+        return;
+      }
+
+      const picked = colleagues[Math.floor(Math.random() * colleagues.length)];
       const res = await fetch('/api/curator/assign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -112,7 +112,7 @@ export const CuratorProvider: React.FC<{ children: React.ReactNode }> = ({ child
           targetDateKey: tomorrowStr,
           curatorUid: picked.uid,
           curatorDisplayName: picked.displayName,
-          curatorDepartment: picked.department
+          curatorDepartment: picked.department || 'Tým'
         })
       });
       if (res.ok) {

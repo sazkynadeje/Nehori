@@ -70,27 +70,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
           <span>Hlavní hra</span>
         </button>
 
-        {isUserCurator && (
-          <button
-            id="nav-tab-curator"
-            onClick={() => setActiveTab('curator')}
-            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium transition-all ${
-              activeTab === 'curator'
-                ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 shadow-lg shadow-indigo-950/40'
-                : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
-            }`}
-          >
-            <Crown className="w-5 h-5 text-amber-400" />
-            <div className="text-left flex-1">
-              <div className="flex items-center justify-between">
-                <span>Kurátor dne</span>
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">
-                  4 slova AI
-                </span>
-              </div>
+        <button
+          id="nav-tab-curator"
+          onClick={() => setActiveTab('curator')}
+          className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium transition-all ${
+            activeTab === 'curator'
+              ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 shadow-lg shadow-indigo-950/40'
+              : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+          }`}
+        >
+          <Crown className="w-5 h-5 text-amber-400" />
+          <div className="text-left flex-1">
+            <div className="flex items-center justify-between">
+              <span>Kurátor dne</span>
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">
+                4 slova AI
+              </span>
             </div>
-          </button>
-        )}
+          </div>
+        </button>
 
         <button
           id="nav-tab-history"
@@ -141,7 +139,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
                 {user.avatarSeed}
               </div>
               <div className="truncate">
-                <p className="text-sm font-semibold text-white truncate">{user.displayName}</p>
+                <div className="flex items-center space-x-1.5 truncate">
+                  <p className="text-sm font-semibold text-white truncate">{user.displayName}</p>
+                  {user.isAdmin && (
+                    <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      ADMIN
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center space-x-1 text-xs text-amber-400 font-medium">
                   <Flame className="w-3.5 h-3.5 fill-amber-400" />
                   <span>Série: {user.stats.currentStreak} dní</span>

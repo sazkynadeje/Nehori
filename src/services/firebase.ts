@@ -21,7 +21,6 @@ import {
   orderBy
 } from 'firebase/firestore';
 import { UserProfile, UserStats, CategoryId, GuessRecord } from '../types';
-import { INITIAL_TEAM_COLLEAGUES } from '../data/team';
 
 // Firebase Client Configuration for project: nenaopak
 const firebaseConfig = {
@@ -65,7 +64,7 @@ export function saveStoredLocalUser(profile: UserProfile): void {
   }
 }
 
-export function createDefaultProfile(uid: string, email: string, displayName: string, department = 'Vedení & IT Architektura'): UserProfile {
+export function createDefaultProfile(uid: string, email: string, displayName: string, department = 'Tým'): UserProfile {
   const isZbynekAdmin = email?.toLowerCase() === 'zbynek.kasnar@gmail.com';
   const finalDisplayName = displayName || (isZbynekAdmin ? 'Zbyněk Kašnar' : email.split('@')[0]);
   const initials = finalDisplayName
@@ -79,10 +78,10 @@ export function createDefaultProfile(uid: string, email: string, displayName: st
     uid,
     email,
     displayName: finalDisplayName,
-    department: isZbynekAdmin ? 'Vedení & IT Architektura' : department,
+    department: 'Tým',
     role: isZbynekAdmin ? 'Administrátor & Správce' : 'Člen týmu',
     avatarSeed: initials,
-    emailVerified: isZbynekAdmin ? true : false,
+    emailVerified: true,
     isAdmin: isZbynekAdmin,
     createdAt: Date.now(),
     stats: {

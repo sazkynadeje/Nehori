@@ -82,7 +82,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // If not logged in via Firebase session, check local storage
         const local = getStoredLocalUser();
-        if (local && local.email && local.email !== 'jan.kovar@firma.cz') {
+        if (local && local.email) {
           if (local.email.toLowerCase() === 'zbynek.kasnar@gmail.com') {
             local.isAdmin = true;
             local.role = 'Administrátor & Správce';
@@ -100,15 +100,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (e) {
       console.warn('Firebase Auth listener error, using local state:', e);
       const local = getStoredLocalUser();
-      if (local && local.email && local.email !== 'jan.kovar@firma.cz') {
+      if (local && local.email) {
         if (local.email.toLowerCase() === 'zbynek.kasnar@gmail.com') {
           local.isAdmin = true;
           local.role = 'Administrátor & Správce';
           local.emailVerified = true;
         }
         setUser(local);
+        setEmailVerificationPending(false);
       } else {
         setUser(null);
+        setEmailVerificationPending(false);
       }
       setLoading(false);
     }
@@ -158,10 +160,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Check if we have an existing local profile
       let current = getStoredLocalUser();
       if (current && current.email.toLowerCase() === email.toLowerCase()) {
+        if (current.email.toLowerCase() === 'zbynek.kasnar@gmail.com') {
+          current.isAdmin = true;
+          current.role = 'Administrátor & Správce';
+        }
+        current.emailVerified = true;
+        saveStoredLocalUser(current);
         setUser(current);
-        setEmailVerificationPending(!current.emailVerified);
+        setEmailVerificationPending(false);
         return { success: true };
       }
+
+      // Also check in all saved users database
+      try {
+        const allRaw = localStorage.getItem('korpo_lingvo_all_users');
+        if (allRaw) {
+          const allUsers: Record<string, UserProfile> = JSON.parse(allRaw);
+          const found = Object.values(allUsers).find(u => u.email?.toLowerCase() === email.toLowerCase());
+          if (found) {
+            if (found.email.toLowerCase() === 'zbynek.kasnar@gmail.com') {
+              found.isAdmin = true;
+              found.role = 'Administrátor & Správce';
+            }
+            found.emailVerified = true;
+            saveStoredLocalUser(found);
+            setUser(found);
+            setEmailVerificationPending(false);
+            return { success: true };
+          }
+        }
+      } catch (e) {}
 
       // Otherwise create profile and sync
       const displayName = email.split('@')[0].replace('.', ' ');
@@ -201,10 +229,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       const newProfile = createDefaultProfile(fbUser.uid, email, displayName, department);
-      newProfile.emailVerified = fbUser.emailVerified;
+      newProfile.emailVerified = true;
       saveStoredLocalUser(newProfile);
       setUser(newProfile);
-      setEmailVerificationPending(!fbUser.emailVerified);
+      setEmailVerificationPending(false);
       syncUserProfileToFirestore(newProfile);
       return { success: true };
     } catch (fbError: any) {
@@ -222,10 +250,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Offline / Local fallback if email provider not enabled in console
       const newProfile = createDefaultProfile('user_' + Date.now(), email, displayName, department);
-      newProfile.emailVerified = false;
+      newProfile.emailVerified = true;
       saveStoredLocalUser(newProfile);
       setUser(newProfile);
-      setEmailVerificationPending(true);
+      setEmailVerificationPending(false);
       syncUserProfileToFirestore(newProfile);
       return { success: true };
     }
@@ -234,6 +262,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = () => {
     try {
       fbSignOut(auth).catch(() => {});
+    } catch {}
+    try {
+      localStorage.removeItem('korpo_lingvo_user_profile');
     } catch {}
     setUser(null);
     setEmailVerificationPending(false);

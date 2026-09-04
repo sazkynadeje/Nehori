@@ -1,7 +1,7 @@
 import React from 'react';
 import { ColleagueRank } from '../types';
 import { ALL_BADGES } from '../data/badges';
-import { X, Trophy, Flame, Target, Award, Building, Briefcase, Calendar, CheckCircle } from 'lucide-react';
+import { X, Trophy, Flame, Target, Award, Briefcase, Calendar, CheckCircle } from 'lucide-react';
 
 interface ColleagueProfileModalProps {
   colleague: ColleagueRank;
@@ -38,10 +38,6 @@ export const ColleagueProfileModal: React.FC<ColleagueProfileModalProps> = ({ co
             <div className="flex items-center space-x-1.5 text-xs text-indigo-300 font-medium mt-0.5">
               <Briefcase className="w-3.5 h-3.5" />
               <span>{colleague.role}</span>
-            </div>
-            <div className="flex items-center space-x-1.5 text-xs text-slate-400 mt-0.5">
-              <Building className="w-3.5 h-3.5" />
-              <span>{colleague.department}</span>
             </div>
           </div>
         </div>

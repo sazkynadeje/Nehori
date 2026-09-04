@@ -378,8 +378,8 @@ Odpověz VÝHRADNĚ ve formátu JSON bez markdownu kolem:
             hintDefinition: parsed.hintDefinition || '',
             hangmanWord: (parsed.hangmanWord || parsed.secretWord).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').slice(0, 14),
             difficulty: parsed.difficulty || 'Střední',
-            selectedBy: 'Tereza Novotná',
-            selectedByDepartment: 'Produktový management',
+            selectedBy: 'Tým',
+            selectedByDepartment: 'Tým',
             millionaire: {
               question: parsed.millionaire.question,
               options: parsed.millionaire.options,
@@ -408,8 +408,8 @@ Odpověz VÝHRADNĚ ve formátu JSON bez markdownu kolem:
       dateKey: dateKey,
       categoryId: categoryId,
       secretWordNormalized: fallbackItem.secretWord.toLowerCase(),
-      selectedBy: fallbackItem.selectedBy || 'Tereza Novotná',
-      selectedByDepartment: fallbackItem.selectedByDepartment || 'Produktový management'
+      selectedBy: fallbackItem.selectedBy || 'Tým',
+      selectedByDepartment: fallbackItem.selectedByDepartment || 'Tým'
     };
 
     dailyWordCache.set(cacheKey, fallbackData);
@@ -521,68 +521,16 @@ interface ActiveUserRecord {
 const activeUsersStore = new Map<string, Map<string, ActiveUserRecord>>(); // dateKey -> (uid -> record)
 const curatorAssignmentsStore = new Map<string, any>(); // targetDateKey -> Assignment
 
-// Pre-seed some active colleagues for today if empty
+// Active colleagues store for today
 function ensureActiveColleagues(dateKey: string) {
   if (!activeUsersStore.has(dateKey)) {
-    const map = new Map<string, ActiveUserRecord>();
-    map.set('colleague_1', { uid: 'colleague_1', displayName: 'Tereza Novotná', department: 'Produktový management', lastActive: Date.now() - 3600000 });
-    map.set('colleague_2', { uid: 'colleague_2', displayName: 'Martin Dvořák', department: 'Datová analytika & AI', lastActive: Date.now() - 7200000 });
-    map.set('colleague_3', { uid: 'colleague_3', displayName: 'Petra Černá', department: 'UX & Product Design', lastActive: Date.now() - 10800000 });
-    map.set('colleague_4', { uid: 'colleague_4', displayName: 'Lukáš Veselý', department: 'Backend & Cloud Infra', lastActive: Date.now() - 14400000 });
-    activeUsersStore.set(dateKey, map);
+    activeUsersStore.set(dateKey, new Map<string, ActiveUserRecord>());
   }
   return activeUsersStore.get(dateKey)!;
 }
 
 // History of played words
-const historyRecords: any[] = [
-  {
-    dateKey: '2026-09-02',
-    formattedDate: 'Středa 2. září 2026',
-    curatorName: 'Tereza Novotná',
-    curatorDepartment: 'Produktový management',
-    words: {
-      work_terminology: {
-        secretWord: 'Retrospektiva',
-        hintDefinition: 'Pravidelné setkání týmu po dokončení sprintu nebo projektu k vyhodnocení procesů a poučení bez hledání viníka.',
-        difficulty: 'Střední'
-      },
-      work_en: {
-        secretWord: 'Bandwidth',
-        hintDefinition: 'The capacity, time or mental space available to take on additional tasks or projects.',
-        difficulty: 'Snadná'
-      },
-      general_en: {
-        secretWord: 'Resilience',
-        hintDefinition: 'The capacity to withstand or to recover quickly from difficulties; mental toughness and adaptability.',
-        difficulty: 'Střední'
-      }
-    }
-  },
-  {
-    dateKey: '2026-09-01',
-    formattedDate: 'Úterý 1. září 2026',
-    curatorName: 'Martin Dvořák',
-    curatorDepartment: 'Datová analytika & AI',
-    words: {
-      work_terminology: {
-        secretWord: 'Prioritizace',
-        hintDefinition: 'Metodické uspořádání úkolů a projektů podle jejich přínosu, urgence a dopadu na firemní cíle.',
-        difficulty: 'Snadná'
-      },
-      work_en: {
-        secretWord: 'Deliverable',
-        hintDefinition: 'A tangible or intangible good or service produced as a result of a project that is intended to be delivered to a client or stakeholder.',
-        difficulty: 'Snadná'
-      },
-      general_en: {
-        secretWord: 'Integrity',
-        hintDefinition: 'The quality of being honest and having strong moral principles; state of being unified and undivided.',
-        difficulty: 'Snadná'
-      }
-    }
-  }
-];
+let historyRecords: any[] = [];
 
 // Helper: Calculate tomorrow date string
 function getTomorrowDateString(currentDateStr?: string): string {
@@ -623,36 +571,33 @@ app.get('/api/curator/status', (req: Request, res: Response) => {
     let assignment = curatorAssignmentsStore.get(targetDateKey);
 
     if (!assignment) {
-      // Pick randomly or designate from active users
+      // Pick randomly or designate from active users if any exist
       const usersList = Array.from(activeUsers.values());
-      const selected = usersList[Math.floor(Math.random() * usersList.length)] || {
-        uid: 'demo_user_1',
-        displayName: 'Jan Kovář',
-        department: 'Vývoj & IT Architektura'
-      };
-
-      assignment = {
-        targetDateKey,
-        activeDateKey: dateKey,
-        curatorUid: selected.uid,
-        curatorDisplayName: selected.displayName,
-        curatorDepartment: selected.department,
-        isCompleted: false,
-        chosenWords: null,
-        submittedAt: null
-      };
-      curatorAssignmentsStore.set(targetDateKey, assignment);
+      if (usersList.length > 0) {
+        const selected = usersList[Math.floor(Math.random() * usersList.length)];
+        assignment = {
+          targetDateKey,
+          activeDateKey: dateKey,
+          curatorUid: selected.uid,
+          curatorDisplayName: selected.displayName,
+          curatorDepartment: selected.department,
+          isCompleted: false,
+          chosenWords: null,
+          submittedAt: null
+        };
+        curatorAssignmentsStore.set(targetDateKey, assignment);
+      }
     }
 
     const todayAssignment = curatorAssignmentsStore.get(dateKey);
     const todayCurator = todayAssignment ? {
-      displayName: todayAssignment.curatorDisplayName || 'Tereza Novotná',
-      department: todayAssignment.curatorDepartment || 'Produktový management',
+      displayName: todayAssignment.curatorDisplayName || 'Tým',
+      department: todayAssignment.curatorDepartment || 'Tým',
       note: 'Vybral(a) jsem pro vás dnešní slova z firemní praxe i mezinárodní spolupráce. Hodně štěstí při hádání!'
     } : {
-      displayName: 'Tereza Novotná',
-      department: 'Produktový management',
-      note: 'Vybrala jsem pro vás dnešní slova z firemní praxe i mezinárodní spolupráce. Hodně štěstí při hádání!'
+      displayName: 'Tým',
+      department: 'Tým',
+      note: 'Dnešní slova z firemní praxe i mezinárodní spolupráce jsou připravena k hádání!'
     };
 
     return res.json({
@@ -1103,11 +1048,12 @@ app.get('/api/history', (req: Request, res: Response) => {
       }
     }
 
+    const curatorAssign = curatorAssignmentsStore.get(todayStr);
     const todayRecord = {
       dateKey: todayStr,
       formattedDate: 'Dnes – ' + todayStr,
-      curatorName: 'Tereza Novotná',
-      curatorDepartment: 'Produktový management',
+      curatorName: curatorAssign?.curatorDisplayName || 'Tým',
+      curatorDepartment: curatorAssign?.curatorDepartment || 'Tým',
       words: todayWords,
       isToday: true
     };
@@ -1118,6 +1064,70 @@ app.get('/api/history', (req: Request, res: Response) => {
     });
   } catch (err: any) {
     return res.status(500).json({ error: 'Chyba při načítání historie.' });
+  }
+});
+
+// API: Take over curator role immediately (for admin or testing)
+app.post('/api/curator/take-over', (req: Request, res: Response) => {
+  try {
+    const { curatorUid, curatorDisplayName, curatorDepartment } = req.body;
+    const today = new Date().toISOString().split('T')[0];
+    const tomorrow = getTomorrowDateString(today);
+    const curatorName = curatorDisplayName || 'Zbyněk Kašnar';
+    const dept = curatorDepartment || 'Vedení & IT Architektura';
+    const uid = curatorUid || 'admin_zbynek';
+
+    const assignment = {
+      targetDateKey: tomorrow,
+      activeDateKey: today,
+      curatorUid: uid,
+      curatorDisplayName: curatorName,
+      curatorDepartment: dept,
+      isCompleted: false,
+      chosenWords: null,
+      submittedAt: null
+    };
+
+    const todayAssignment = {
+      targetDateKey: today,
+      activeDateKey: today,
+      curatorUid: uid,
+      curatorDisplayName: curatorName,
+      curatorDepartment: dept,
+      isCompleted: true,
+      chosenWords: null,
+      submittedAt: Date.now()
+    };
+
+    curatorAssignmentsStore.set(tomorrow, assignment);
+    curatorAssignmentsStore.set(today, todayAssignment);
+
+    return res.json({
+      success: true,
+      assignment,
+      todayCurator: {
+        displayName: curatorName,
+        department: dept,
+        note: `Jsem kurátorem pro dnešní i zítřejší den (${curatorName}). Hodně štěstí při hádání!`
+      }
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'Chyba při převzetí role kurátora.' });
+  }
+});
+
+// API: Reset / Clear system cache & data for pristine testing
+app.post('/api/admin/reset-data', (req: Request, res: Response) => {
+  try {
+    dailyWordCache.clear();
+    curatorAssignmentsStore.clear();
+    historyRecords = [];
+    return res.json({
+      success: true,
+      message: 'Systémová mezipaměť, historie a kurátorská přiřazení byla vyprázdněna pro čistý start.'
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'Chyba při resetování dat.' });
   }
 });
 

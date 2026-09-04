@@ -30,8 +30,8 @@ const MainAppContent: React.FC = () => {
     );
   }
 
-  // If not logged in or email not yet verified
-  if (!user || emailVerificationPending || !user.emailVerified) {
+  // If not logged in or verification explicitly pending
+  if (!user || emailVerificationPending) {
     return <AuthView />;
   }
 
