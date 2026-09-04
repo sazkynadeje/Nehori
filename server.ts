@@ -24,6 +24,24 @@ function getGeminiClient(): GoogleGenAI | null {
   return aiClient;
 }
 
+// Resilient Gemini content generation with multi-model fallback
+async function generateGeminiWithFallback(ai: GoogleGenAI, prompt: string, config?: any) {
+  try {
+    return await ai.models.generateContent({
+      model: 'gemini-3.1-flash-lite',
+      contents: prompt,
+      config
+    });
+  } catch (err: any) {
+    console.warn('gemini-3.1-flash-lite call failed, trying gemini-flash-latest fallback:', err?.status || err?.message || err);
+    return await ai.models.generateContent({
+      model: 'gemini-flash-latest',
+      contents: prompt,
+      config
+    });
+  }
+}
+
 // Normalized string distance fallback calculation
 function calculateFallbackTemperature(guess: string, target: string, category: string): { temperature: number; hint: string } {
   const g = guess.trim().toLowerCase();
@@ -97,12 +115,8 @@ Odpověz VÝHRADNĚ ve formátu JSON s těmito klíči:
   "similarityReason": string (stručný a trefný komentář v češtině, max 1 věta)
 }`;
 
-        const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: prompt,
-          config: {
-            responseMimeType: 'application/json'
-          }
+        const response = await generateGeminiWithFallback(ai, prompt, {
+          responseMimeType: 'application/json'
         });
 
         const rawText = response.text || '';
@@ -359,13 +373,9 @@ Odpověz VÝHRADNĚ ve formátu JSON bez markdownu kolem:
   }
 }`;
 
-        const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: prompt,
-          config: {
-            responseMimeType: 'application/json',
-            temperature: 0.2
-          }
+        const response = await generateGeminiWithFallback(ai, prompt, {
+          responseMimeType: 'application/json',
+          temperature: 0.2
         });
 
         const parsed = JSON.parse(response.text || '{}');
@@ -378,8 +388,8 @@ Odpověz VÝHRADNĚ ve formátu JSON bez markdownu kolem:
             hintDefinition: parsed.hintDefinition || '',
             hangmanWord: (parsed.hangmanWord || parsed.secretWord).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').slice(0, 14),
             difficulty: parsed.difficulty || 'Střední',
-            selectedBy: 'Tým',
-            selectedByDepartment: 'Tým',
+            selectedBy: 'Tereza Novotná',
+            selectedByDepartment: 'Produktový management',
             millionaire: {
               question: parsed.millionaire.question,
               options: parsed.millionaire.options,
@@ -408,8 +418,8 @@ Odpověz VÝHRADNĚ ve formátu JSON bez markdownu kolem:
       dateKey: dateKey,
       categoryId: categoryId,
       secretWordNormalized: fallbackItem.secretWord.toLowerCase(),
-      selectedBy: fallbackItem.selectedBy || 'Tým',
-      selectedByDepartment: fallbackItem.selectedByDepartment || 'Tým'
+      selectedBy: fallbackItem.selectedBy || 'Tereza Novotná',
+      selectedByDepartment: fallbackItem.selectedByDepartment || 'Produktový management'
     };
 
     dailyWordCache.set(cacheKey, fallbackData);
@@ -463,12 +473,8 @@ Odpověz VÝHRADNĚ ve formátu JSON:
   }
 }`;
 
-        const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: prompt,
-          config: {
-            responseMimeType: 'application/json'
-          }
+        const response = await generateGeminiWithFallback(ai, prompt, {
+          responseMimeType: 'application/json'
         });
 
         const parsed = JSON.parse(response.text || '{}');
@@ -521,16 +527,93 @@ interface ActiveUserRecord {
 const activeUsersStore = new Map<string, Map<string, ActiveUserRecord>>(); // dateKey -> (uid -> record)
 const curatorAssignmentsStore = new Map<string, any>(); // targetDateKey -> Assignment
 
-// Active colleagues store for today
+// Pre-seed some active colleagues for today if empty
 function ensureActiveColleagues(dateKey: string) {
   if (!activeUsersStore.has(dateKey)) {
-    activeUsersStore.set(dateKey, new Map<string, ActiveUserRecord>());
+    const map = new Map<string, ActiveUserRecord>();
+    map.set('colleague_1', { uid: 'colleague_1', displayName: 'Tereza Novotná', department: 'Produktový management', lastActive: Date.now() - 3600000 });
+    map.set('colleague_2', { uid: 'colleague_2', displayName: 'Martin Dvořák', department: 'Datová analytika & AI', lastActive: Date.now() - 7200000 });
+    map.set('colleague_3', { uid: 'colleague_3', displayName: 'Petra Černá', department: 'UX & Product Design', lastActive: Date.now() - 10800000 });
+    map.set('colleague_4', { uid: 'colleague_4', displayName: 'Lukáš Veselý', department: 'Backend & Cloud Infra', lastActive: Date.now() - 14400000 });
+    activeUsersStore.set(dateKey, map);
   }
   return activeUsersStore.get(dateKey)!;
 }
 
-// History of played words
-let historyRecords: any[] = [];
+// Initial seed history of past played words (strictly past days, never today or future)
+const SEED_HISTORY_RECORDS: any[] = [
+  {
+    dateKey: '2026-09-03',
+    formattedDate: 'Čtvrtek 3. září 2026',
+    curatorName: 'Tomáš Král',
+    curatorDepartment: 'Security & Cloud Architektura',
+    words: {
+      work_terminology: {
+        secretWord: 'Eskalace',
+        hintDefinition: 'Předání problému, rizika či rozhodnutí na vyšší úroveň řízení, pokud jej nelze vyřešit na stávající úrovni.',
+        difficulty: 'Střední'
+      },
+      work_en: {
+        secretWord: 'Stakeholder',
+        hintDefinition: 'A person, group or organization that has interest or concern in an organization or project.',
+        difficulty: 'Snadná'
+      },
+      general_en: {
+        secretWord: 'Perspective',
+        hintDefinition: 'A particular attitude toward or way of regarding something; a point of view.',
+        difficulty: 'Snadná'
+      }
+    }
+  },
+  {
+    dateKey: '2026-09-02',
+    formattedDate: 'Středa 2. září 2026',
+    curatorName: 'Tereza Novotná',
+    curatorDepartment: 'Produktový management',
+    words: {
+      work_terminology: {
+        secretWord: 'Retrospektiva',
+        hintDefinition: 'Pravidelné setkání týmu po dokončení sprintu nebo projektu k vyhodnocení procesů a poučení bez hledání viníka.',
+        difficulty: 'Střední'
+      },
+      work_en: {
+        secretWord: 'Bandwidth',
+        hintDefinition: 'The capacity, time or mental space available to take on additional tasks or projects.',
+        difficulty: 'Snadná'
+      },
+      general_en: {
+        secretWord: 'Resilience',
+        hintDefinition: 'The capacity to withstand or to recover quickly from difficulties; mental toughness and adaptability.',
+        difficulty: 'Střední'
+      }
+    }
+  },
+  {
+    dateKey: '2026-09-01',
+    formattedDate: 'Úterý 1. září 2026',
+    curatorName: 'Martin Dvořák',
+    curatorDepartment: 'Datová analytika & AI',
+    words: {
+      work_terminology: {
+        secretWord: 'Prioritizace',
+        hintDefinition: 'Metodické uspořádání úkolů a projektů podle jejich přínosu, urgence a dopadu na firemní cíle.',
+        difficulty: 'Snadná'
+      },
+      work_en: {
+        secretWord: 'Deliverable',
+        hintDefinition: 'A tangible or intangible good or service produced as a result of a project that is intended to be delivered to a client or stakeholder.',
+        difficulty: 'Snadná'
+      },
+      general_en: {
+        secretWord: 'Integrity',
+        hintDefinition: 'The quality of being honest and having strong moral principles; state of being unified and undivided.',
+        difficulty: 'Snadná'
+      }
+    }
+  }
+];
+
+let historyRecords: any[] = [...SEED_HISTORY_RECORDS];
 
 // Helper: Calculate tomorrow date string
 function getTomorrowDateString(currentDateStr?: string): string {
@@ -571,33 +654,36 @@ app.get('/api/curator/status', (req: Request, res: Response) => {
     let assignment = curatorAssignmentsStore.get(targetDateKey);
 
     if (!assignment) {
-      // Pick randomly or designate from active users if any exist
+      // Pick randomly or designate from active users
       const usersList = Array.from(activeUsers.values());
-      if (usersList.length > 0) {
-        const selected = usersList[Math.floor(Math.random() * usersList.length)];
-        assignment = {
-          targetDateKey,
-          activeDateKey: dateKey,
-          curatorUid: selected.uid,
-          curatorDisplayName: selected.displayName,
-          curatorDepartment: selected.department,
-          isCompleted: false,
-          chosenWords: null,
-          submittedAt: null
-        };
-        curatorAssignmentsStore.set(targetDateKey, assignment);
-      }
+      const selected = usersList[Math.floor(Math.random() * usersList.length)] || {
+        uid: 'demo_user_1',
+        displayName: 'Jan Kovář',
+        department: 'Vývoj & IT Architektura'
+      };
+
+      assignment = {
+        targetDateKey,
+        activeDateKey: dateKey,
+        curatorUid: selected.uid,
+        curatorDisplayName: selected.displayName,
+        curatorDepartment: selected.department,
+        isCompleted: false,
+        chosenWords: null,
+        submittedAt: null
+      };
+      curatorAssignmentsStore.set(targetDateKey, assignment);
     }
 
     const todayAssignment = curatorAssignmentsStore.get(dateKey);
     const todayCurator = todayAssignment ? {
-      displayName: todayAssignment.curatorDisplayName || 'Tým',
-      department: todayAssignment.curatorDepartment || 'Tým',
+      displayName: todayAssignment.curatorDisplayName || 'Tereza Novotná',
+      department: todayAssignment.curatorDepartment || 'Produktový management',
       note: 'Vybral(a) jsem pro vás dnešní slova z firemní praxe i mezinárodní spolupráce. Hodně štěstí při hádání!'
     } : {
-      displayName: 'Tým',
-      department: 'Tým',
-      note: 'Dnešní slova z firemní praxe i mezinárodní spolupráce jsou připravena k hádání!'
+      displayName: 'Tereza Novotná',
+      department: 'Produktový management',
+      note: 'Vybrala jsem pro vás dnešní slova z firemní praxe i mezinárodní spolupráce. Hodně štěstí při hádání!'
     };
 
     return res.json({
@@ -688,13 +774,9 @@ Vrať POUZE validní JSON pole se 4 položkami:
   ... (celkem přesně 4 položky)
 ]`;
 
-        const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: prompt,
-          config: {
-            responseMimeType: 'application/json',
-            temperature: 0.7
-          }
+        const response = await generateGeminiWithFallback(ai, prompt, {
+          responseMimeType: 'application/json',
+          temperature: 0.7
         });
 
         const parsed = JSON.parse(response.text || '[]');
@@ -1019,48 +1101,20 @@ app.post('/api/curator/submit', (req: Request, res: Response) => {
   }
 });
 
-// API: History of Days
+// API: History of Past Days (strictly closed past rounds, never active today)
 app.get('/api/history', (req: Request, res: Response) => {
   try {
     const todayStr = new Date().toISOString().split('T')[0];
     
-    // Check if today is already in history, if not compose today's entry
-    const todayWords: any = {};
-    for (const catId of ['work_terminology', 'work_en', 'general_en']) {
-      const cacheKey = `${todayStr}_${catId}`;
-      if (dailyWordCache.has(cacheKey)) {
-        const w = dailyWordCache.get(cacheKey);
-        todayWords[catId] = {
-          secretWord: w.secretWord,
-          hintDefinition: w.hintDefinition,
-          difficulty: w.difficulty
-        };
-      } else {
-        const fallbacks = FALLBACK_WORDS[catId] || FALLBACK_WORDS.work_terminology;
-        const charSum = todayStr.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
-        const index = charSum % fallbacks.length;
-        const item = fallbacks[index];
-        todayWords[catId] = {
-          secretWord: item.secretWord,
-          hintDefinition: item.hintDefinition,
-          difficulty: item.difficulty
-        };
-      }
-    }
-
-    const curatorAssign = curatorAssignmentsStore.get(todayStr);
-    const todayRecord = {
-      dateKey: todayStr,
-      formattedDate: 'Dnes – ' + todayStr,
-      curatorName: curatorAssign?.curatorDisplayName || 'Tým',
-      curatorDepartment: curatorAssign?.curatorDepartment || 'Tým',
-      words: todayWords,
-      isToday: true
-    };
+    // Only strictly past days (dateKey < todayStr) belong in the archive
+    // to protect today's active challenge words from being spoiled
+    const pastRecords = historyRecords
+      .filter((rec: any) => rec.dateKey < todayStr)
+      .sort((a: any, b: any) => b.dateKey.localeCompare(a.dateKey));
 
     return res.json({
       success: true,
-      history: [todayRecord, ...historyRecords]
+      history: pastRecords
     });
   } catch (err: any) {
     return res.status(500).json({ error: 'Chyba při načítání historie.' });
@@ -1121,7 +1175,7 @@ app.post('/api/admin/reset-data', (req: Request, res: Response) => {
   try {
     dailyWordCache.clear();
     curatorAssignmentsStore.clear();
-    historyRecords = [];
+    historyRecords = [...SEED_HISTORY_RECORDS];
     return res.json({
       success: true,
       message: 'Systémová mezipaměť, historie a kurátorská přiřazení byla vyprázdněna pro čistý start.'

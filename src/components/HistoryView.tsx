@@ -38,10 +38,8 @@ export const HistoryView: React.FC = () => {
   const { user } = useAuth();
   const [historyList, setHistoryList] = useState<HistoryDayData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedDay, setExpandedDay] = useState<string | null>(getTodayDateString());
+  const [expandedDay, setExpandedDay] = useState<string | null>(null);
   const [activeInfoTab, setActiveInfoTab] = useState<'auth' | 'history' | 'curator'>('history');
-
-  const todayStr = getTodayDateString();
 
   useEffect(() => {
     const fetchHistory = async () => {
@@ -52,6 +50,9 @@ export const HistoryView: React.FC = () => {
           const json = await res.json();
           if (json.success && json.history) {
             setHistoryList(json.history);
+            if (json.history.length > 0) {
+              setExpandedDay(json.history[0].dateKey);
+            }
           }
         }
       } catch (e) {
@@ -223,20 +224,44 @@ export const HistoryView: React.FC = () => {
 
       {/* Days Archive & Words Played */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold text-white flex items-center space-x-2">
-            <Calendar className="w-5 h-5 text-indigo-400" />
-            <span>Archiv odehraných dnů a slov</span>
-          </h3>
-          <span className="text-xs text-slate-400 font-medium">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h3 className="text-lg font-bold text-white flex items-center space-x-2">
+              <Calendar className="w-5 h-5 text-indigo-400" />
+              <span>Archiv odehraných dnů a slov</span>
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Historický přehled minulých kol, kurátorů a správných řešení.
+            </p>
+          </div>
+          <span className="text-xs text-slate-400 font-medium self-start sm:self-auto">
             Celkem v archivu: <strong className="text-white">{historyList.length} dní</strong>
           </span>
+        </div>
+
+        {/* Spoiler protection callout */}
+        <div className="bg-indigo-950/30 border border-indigo-500/20 rounded-2xl p-4 text-xs text-indigo-300 flex items-start space-x-3">
+          <ShieldCheck className="w-4 h-4 text-indigo-400 mt-0.5 flex-shrink-0" />
+          <div className="space-y-0.5">
+            <span className="font-bold text-indigo-200 block">Ochrana dnešních slov před vyzrazením</span>
+            <p className="text-slate-300 leading-relaxed">
+              V archivu se nachází výhradně ukončené dny z minulosti. Dnešní aktivní slova jsou střežena v sekci „Denní výzva“ a do tohoto archivu se zařadí až po půlnoci, aby nedocházelo ke spoilerům.
+            </p>
+          </div>
         </div>
 
         {loading ? (
           <div className="py-16 flex flex-col items-center justify-center space-y-3 bg-[#11192e] rounded-3xl border border-slate-800">
             <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
             <p className="text-sm text-slate-400">Načítání historie odehraných slov...</p>
+          </div>
+        ) : historyList.length === 0 ? (
+          <div className="py-12 px-4 text-center bg-[#11192e] rounded-2xl border border-slate-800 space-y-2">
+            <Calendar className="w-8 h-8 text-slate-500 mx-auto" />
+            <h4 className="text-sm font-bold text-white">Archiv je zatím prázdný</h4>
+            <p className="text-xs text-slate-400 max-w-md mx-auto">
+              Minulé herní dny se do archivu ukládají po skončení každého dne o půlnoci.
+            </p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -247,9 +272,7 @@ export const HistoryView: React.FC = () => {
               return (
                 <div
                   key={day.dateKey}
-                  className={`bg-[#11192e] rounded-2xl border transition-all overflow-hidden ${
-                    day.isToday ? 'border-indigo-500/50 shadow-lg shadow-indigo-950/30' : 'border-slate-800'
-                  }`}
+                  className="bg-[#11192e] rounded-2xl border border-slate-800 transition-all overflow-hidden"
                 >
                   {/* Day Header Row */}
                   <div
@@ -257,9 +280,7 @@ export const HistoryView: React.FC = () => {
                     className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer hover:bg-slate-800/30 transition-colors"
                   >
                     <div className="flex items-center space-x-3.5">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm ${
-                        day.isToday ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300'
-                      }`}>
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm bg-slate-800 text-slate-300">
                         <Calendar className="w-5 h-5" />
                       </div>
 
@@ -268,11 +289,6 @@ export const HistoryView: React.FC = () => {
                           <h4 className="text-base font-bold text-white">
                             {day.formattedDate}
                           </h4>
-                          {day.isToday && (
-                            <span className="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 text-[10px] font-extrabold uppercase">
-                              Dnešek
-                            </span>
-                          )}
                         </div>
 
                         <div className="text-xs text-slate-400 flex items-center space-x-1.5 mt-0.5">
